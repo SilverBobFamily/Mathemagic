@@ -1,0 +1,89 @@
+<h2>Game Board Layout</h2>
+<p class="subtitle">What a match looks like mid-game. Does this arrangement feel right?</p>
+
+<div style="margin-top:16px; background:#0a0a1a; border-radius:12px; overflow:hidden; border:2px solid #333; font-family:sans-serif; font-size:0.82em;">
+
+  <!-- Opponent area -->
+  <div style="background:#1a0a0a; padding:10px 16px; border-bottom:1px solid #333;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="color:#ef9a9a; font-weight:700;">⚔ Opponent</span>
+      <span style="color:#ef9a9a;">Score: <strong style="font-size:1.2em;">11</strong> &nbsp;·&nbsp; Cards left: 8</span>
+    </div>
+    <!-- Opponent's field -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <!-- A creature with an item attached -->
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #5c6bc0; background:#1a237e; text-align:center; position:relative;">
+        <div style="background:#0d1642; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Medusa</span><span>-2</span></div>
+        <div style="font-size:1.8em; padding:4px;">🐍</div>
+        <!-- Attached item tag -->
+        <div style="background:#2e7d32; color:#a5d6a7; font-size:0.6em; padding:1px 4px; font-weight:700;">+3 Ambrosia</div>
+        <div style="color:#aaa; font-size:0.65em; padding:2px;">= 1</div>
+      </div>
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #5c6bc0; background:#1a237e; text-align:center;">
+        <div style="background:#0d1642; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Ares</span><span>6</span></div>
+        <div style="font-size:1.8em; padding:4px;">⚔️</div>
+        <div style="color:#aaa; font-size:0.65em; padding:2px;">= 6</div>
+      </div>
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #5c6bc0; background:#1a237e; text-align:center;">
+        <div style="background:#0d1642; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Hermes</span><span>4</span></div>
+        <div style="font-size:1.8em; padding:4px;">👟</div>
+        <div style="color:#aaa; font-size:0.65em; padding:2px;">= 4</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider / game status -->
+  <div style="background:#111; padding:6px 16px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+    <span style="color:#555; font-size:0.85em;">Round 5 of 16 &nbsp;·&nbsp; Your turn</span>
+    <span style="color:#ffd54f; font-size:0.85em; font-weight:700;">🏛️ Greek Mythology</span>
+    <span style="color:#555; font-size:0.85em;">Deck: Release 1 + 2</span>
+  </div>
+
+  <!-- Player area -->
+  <div style="background:#0a1a0a; padding:10px 16px; border-bottom:1px solid #333;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="color:#a5d6a7; font-weight:700;">🧑 You</span>
+      <span style="color:#a5d6a7;">Score: <strong style="font-size:1.2em;">14</strong> &nbsp;·&nbsp; Cards left: 7</span>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #5c6bc0; background:#1a237e; text-align:center; position:relative;">
+        <div style="background:#0d1642; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Zeus</span><span>8</span></div>
+        <div style="font-size:1.8em; padding:4px;">⚡</div>
+        <!-- Attached action tag -->
+        <div style="background:#4a148c; color:#ce93d8; font-size:0.6em; padding:1px 4px; font-weight:700;">×2 Cyclone</div>
+        <div style="color:#aaa; font-size:0.65em; padding:2px;">= 16</div>
+      </div>
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #5c6bc0; background:#1a237e; text-align:center;">
+        <div style="background:#0d1642; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Athena</span><span>5</span></div>
+        <div style="font-size:1.8em; padding:4px;">🦉</div>
+        <div style="color:#aaa; font-size:0.65em; padding:2px;">= 5</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hand -->
+  <div style="background:#0a0a14; padding:10px 16px;">
+    <div style="color:#555; font-size:0.75em; margin-bottom:8px; letter-spacing:1px;">YOUR HAND — Click a card to play it</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <!-- Playable card in hand -->
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #ffd54f; background:#1b5e20; text-align:center; cursor:pointer; box-shadow:0 0 10px rgba(255,213,79,0.4);">
+        <div style="background:#0a2e0e; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Nectar</span><span>+5</span></div>
+        <div style="font-size:1.8em; padding:4px;">🍯</div>
+        <div style="color:#a5d6a7; font-size:0.6em; padding:2px;">ITEM</div>
+      </div>
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #ffd54f; background:#4a148c; text-align:center; cursor:pointer; box-shadow:0 0 10px rgba(255,213,79,0.4);">
+        <div style="background:#1a0533; padding:2px 4px; font-size:0.75em; color:#fff; font-weight:700; display:flex; justify-content:space-between;"><span>Bolt ×10</span><span>×10</span></div>
+        <div style="font-size:1.8em; padding:4px;">⚡</div>
+        <div style="color:#ce93d8; font-size:0.6em; padding:2px;">ACTION</div>
+      </div>
+      <div style="width:70px; border-radius:6px; overflow:hidden; border:3px solid #555; background:#111; text-align:center; opacity:0.5;">
+        <div style="background:#0a0a0a; padding:2px 4px; font-size:0.75em; color:#555; font-weight:700;">Next draw</div>
+        <div style="font-size:1.8em; padding:4px;">🂠</div>
+        <div style="color:#555; font-size:0.6em; padding:2px;">UNKNOWN</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Opponent's field on top, yours on bottom, hand at the bottom with glowing cards ready to play. Attached modifiers show inline on each creature. Confirm in the terminal or flag anything.</p>

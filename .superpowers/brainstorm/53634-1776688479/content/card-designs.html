@@ -1,0 +1,72 @@
+<h2>Card Anatomy</h2>
+<p class="subtitle">One card from each type — Greek Mythology release. Does this structure feel right?</p>
+
+<div class="cards" style="grid-template-columns: repeat(4, 1fr); gap: 16px;">
+
+  <!-- CREATURE -->
+  <div class="card" data-choice="creature" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(160deg, #1a237e, #283593); padding: 16px; text-align:center; position:relative;">
+      <div style="font-size:0.65em; font-weight:700; letter-spacing:2px; color:#90caf9; text-transform:uppercase;">Creature · Greek Mythology</div>
+      <div style="font-size:3em; margin: 8px 0;">⚡</div>
+      <div style="font-size:1.1em; font-weight:700; color:white;">Zeus</div>
+      <div style="position:absolute; top:12px; right:12px; background:#1565c0; color:white; font-size:1.4em; font-weight:900; padding:4px 10px; border-radius:8px;">+8</div>
+    </div>
+    <div class="card-body" style="font-size:0.85em;">
+      <div style="color:#aaa; font-size:0.75em; margin-bottom:4px;">CREATURE</div>
+      <p style="margin:0; font-style:italic;">"King of the gods. His presence demands respect."</p>
+      <div style="margin-top:8px; font-size:0.8em; color:#888;">Value: +8 &nbsp;·&nbsp; Stays on your side</div>
+    </div>
+  </div>
+
+  <!-- ITEM -->
+  <div class="card" data-choice="item" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(160deg, #1b5e20, #2e7d32); padding: 16px; text-align:center; position:relative;">
+      <div style="font-size:0.65em; font-weight:700; letter-spacing:2px; color:#a5d6a7; text-transform:uppercase;">Item · Greek Mythology</div>
+      <div style="font-size:3em; margin: 8px 0;">🏺</div>
+      <div style="font-size:1.1em; font-weight:700; color:white;">Ambrosia</div>
+      <div style="position:absolute; top:12px; right:12px; background:#2e7d32; color:white; font-size:1.4em; font-weight:900; padding:4px 10px; border-radius:8px;">+3</div>
+    </div>
+    <div class="card-body" style="font-size:0.85em;">
+      <div style="color:#aaa; font-size:0.75em; margin-bottom:4px;">ITEM · ADD/SUBTRACT</div>
+      <p style="margin:0; font-style:italic;">"The food of the gods. Adds +3 to one creature."</p>
+      <div style="margin-top:8px; font-size:0.8em; color:#888;">Effect: +3 to target &nbsp;·&nbsp; Stays on field</div>
+    </div>
+  </div>
+
+  <!-- ACTION -->
+  <div class="card" data-choice="action" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(160deg, #4a148c, #6a1b9a); padding: 16px; text-align:center; position:relative;">
+      <div style="font-size:0.65em; font-weight:700; letter-spacing:2px; color:#ce93d8; text-transform:uppercase;">Action · Greek Mythology</div>
+      <div style="font-size:3em; margin: 8px 0;">🌀</div>
+      <div style="font-size:1.1em; font-weight:700; color:white;">Cyclone of Poseidon</div>
+      <div style="position:absolute; top:12px; right:12px; background:#6a1b9a; color:white; font-size:1.4em; font-weight:900; padding:4px 10px; border-radius:8px;">×5</div>
+    </div>
+    <div class="card-body" style="font-size:0.85em;">
+      <div style="color:#aaa; font-size:0.75em; margin-bottom:4px;">ACTION · MULTIPLY/DIVIDE</div>
+      <p style="margin:0; font-style:italic;">"The seas obey. Multiplies one creature by 5."</p>
+      <div style="margin-top:8px; font-size:0.8em; color:#888;">Effect: ×5 to target &nbsp;·&nbsp; Stays on field</div>
+    </div>
+  </div>
+
+  <!-- EVENT -->
+  <div class="card" data-choice="event" onclick="toggleSelect(this)" style="cursor:pointer;">
+    <div class="card-image" style="background: linear-gradient(160deg, #b71c1c, #c62828); padding: 16px; text-align:center; position:relative;">
+      <div style="font-size:0.65em; font-weight:700; letter-spacing:2px; color:#ef9a9a; text-transform:uppercase;">Event · Greek Mythology</div>
+      <div style="font-size:3em; margin: 8px 0;">🌋</div>
+      <div style="font-size:1.1em; font-weight:700; color:white;">Wrath of Hades</div>
+      <div style="position:absolute; top:12px; right:12px; background:#b71c1c; color:white; font-size:1.1em; font-weight:900; padding:4px 8px; border-radius:8px;">ZERO</div>
+    </div>
+    <div class="card-body" style="font-size:0.85em;">
+      <div style="color:#aaa; font-size:0.75em; margin-bottom:4px;">EVENT · MAJOR EFFECT</div>
+      <p style="margin:0; font-style:italic;">"The underworld claims one. Reduces any creature to 0."</p>
+      <div style="margin-top:8px; font-size:0.8em; color:#888;">Effect: Set target to 0 &nbsp;·&nbsp; Stays on field</div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; padding:16px; background:#1a1a2e; border-radius:8px; font-size:0.85em;">
+  <strong>Each card has:</strong> Release · Type · Name · Icon (placeholder art) · Value/Operator · Flavor text · Effect reminder
+</div>
+
+<p class="subtitle" style="margin-top:12px;">Click any card type if something looks off, or let me know in the terminal.</p>

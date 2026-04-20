@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0d0d1a; color: #eee; font-family: sans-serif; padding: 20px; margin: 0; }
+  h2 { color: #fff; margin: 0 0 4px; }
+  .subtitle { color: #888; margin: 0 0 16px; font-size: 0.9em; }
+  .board { background: #0a0a1a; border-radius: 12px; overflow: hidden; border: 2px solid #333; }
+  .zone { padding: 12px 16px; border-bottom: 1px solid #333; }
+  .zone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .opponent-zone { background: #1a0a0a; }
+  .player-zone { background: #0a1a0a; }
+  .hand-zone { background: #0a0a14; }
+  .status-bar { background: #111; padding: 6px 16px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; color: #555; }
+  .field { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .field-card { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #5c6bc0; background: #1a237e; text-align: center; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .field-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(100,120,255,0.4); }
+  .field-card .name-bar { background: #0d1642; padding: 3px 6px; font-size: 0.8em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; }
+  .field-card .art { font-size: 2.4em; padding: 6px 0; }
+  .field-card .modifier-tag { font-size: 0.7em; padding: 2px 4px; font-weight: 700; }
+  .field-card .total { color: #aaa; font-size: 0.75em; padding: 3px; background: #111; }
+  .item-tag { background: #2e7d32; color: #a5d6a7; }
+  .action-tag { background: #4a148c; color: #ce93d8; }
+
+  .hand-card { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #ffd54f; text-align: center; cursor: pointer; box-shadow: 0 0 12px rgba(255,213,79,0.4); transition: transform 0.15s; }
+  .hand-card:hover { transform: translateY(-6px); }
+  .hand-card .name-bar { padding: 3px 6px; font-size: 0.8em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; }
+  .hand-card .art { font-size: 2.4em; padding: 6px 0; }
+  .hand-card .type-tag { font-size: 0.7em; padding: 3px; letter-spacing: 1px; }
+  .hand-unknown { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #444; background: #111; text-align: center; opacity: 0.4; }
+
+  /* Modal overlay */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 100; align-items: center; justify-content: center; gap: 20px; }
+  .modal-overlay.open { display: flex; }
+
+  /* Full card */
+  .full-card { width: 220px; border-radius: 14px; overflow: hidden; font-family: serif; flex-shrink: 0; }
+  .fc-name-bar { padding: 7px 12px; font-size: 1em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .fc-art { height: 140px; display: flex; align-items: center; justify-content: center; font-size: 5.5em; }
+  .fc-type-line { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; font-size: 0.75em; font-style: italic; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .fc-text { padding: 10px 12px; min-height: 70px; font-size: 0.82em; }
+  .fc-text .effect { color: #ddd; margin: 0 0 8px; }
+  .fc-text .flavor { color: #999; font-style: italic; margin: 0; }
+  .fc-footer { padding: 5px 10px; font-size: 0.65em; letter-spacing: 1px; text-align: right; }
+
+  /* Math panel */
+  .math-panel { background: #12122a; border: 2px solid #2a2a5a; border-radius: 12px; padding: 16px 20px; min-width: 200px; max-width: 240px; }
+  .math-panel h4 { margin: 0 0 12px; color: #90caf9; font-size: 0.85em; letter-spacing: 1px; text-transform: uppercase; }
+  .math-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1e1e3a; font-size: 0.9em; }
+  .math-row.total-row { border-bottom: none; font-weight: 700; font-size: 1.1em; color: #ffd54f; margin-top: 4px; padding-top: 12px; border-top: 2px solid #2a2a5a; }
+  .math-label { color: #888; }
+  .math-value { color: #fff; font-family: monospace; font-size: 1.05em; }
+</style>
+</head>
+<body>
+
+<h2>Game Board Layout</h2>
+<p class="subtitle">Click any card to see the full view · Math panel appears when modifiers are present</p>
+
+<div class="board">
+  <div class="zone opponent-zone">
+    <div class="zone-header">
+      <span style="color:#ef9a9a;font-weight:700;font-size:1.1em;">⚔ Opponent</span>
+      <span style="color:#ef9a9a;">Score: <strong style="font-size:1.4em;">11</strong> &nbsp;·&nbsp; Cards left: 8</span>
+    </div>
+    <div class="field">
+      <div class="field-card" onclick="openCard('medusa')">
+        <div class="name-bar"><span>Medusa</span><span style="color:#ef9a9a;">-2</span></div>
+        <div class="art">🐍</div>
+        <div class="modifier-tag item-tag">+3 Ambrosia</div>
+        <div class="total">= 1</div>
+      </div>
+      <div class="field-card" onclick="openCard('ares')">
+        <div class="name-bar"><span>Ares</span><span>6</span></div>
+        <div class="art">⚔️</div>
+      </div>
+      <div class="field-card" onclick="openCard('hermes')">
+        <div class="name-bar"><span>Hermes</span><span>4</span></div>
+        <div class="art">👟</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span>Round 5 of 16 · Your turn</span>
+    <span style="color:#ffd54f;font-weight:700;">🏛️ Greek Mythology</span>
+    <span>Deck: Release 1 + 2</span>
+  </div>
+
+  <div class="zone player-zone">
+    <div class="zone-header">
+      <span style="color:#a5d6a7;font-weight:700;font-size:1.1em;">🧑 You</span>
+      <span style="color:#a5d6a7;">Score: <strong style="font-size:1.4em;">21</strong> &nbsp;·&nbsp; Cards left: 7</span>
+    </div>
+    <div class="field">
+      <div class="field-card" onclick="openCard('zeus')">
+        <div class="name-bar"><span>Zeus</span><span>8</span></div>
+        <div class="art">⚡</div>
+        <div class="modifier-tag action-tag">×2 Cyclone</div>
+        <div class="total">= 16</div>
+      </div>
+      <div class="field-card" onclick="openCard('athena')">
+        <div class="name-bar"><span>Athena</span><span>5</span></div>
+        <div class="art">🦉</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="zone hand-zone" style="border-bottom:none;">
+    <div style="color:#555;font-size:0.75em;margin-bottom:10px;letter-spacing:1px;">YOUR HAND — Click to inspect</div>
+    <div class="field">
+      <div class="hand-card" style="background:#1b5e20;" onclick="openCard('nectar')">
+        <div class="name-bar" style="background:#0a2e0e;"><span>Nectar</span><span style="color:#a5d6a7;">+5</span></div>
+        <div class="art">🍯</div>
+        <div class="type-tag" style="background:#071a09;color:#a5d6a7;">ITEM</div>
+      </div>
+      <div class="hand-card" style="background:#4a148c;" onclick="openCard('thunderbolt')">
+        <div class="name-bar" style="background:#1a0533;"><span>Thunderbolt</span><span style="color:#ce93d8;">×10</span></div>
+        <div class="art">⚡</div>
+        <div class="type-tag" style="background:#0f0120;color:#ce93d8;">ACTION</div>
+      </div>
+      <div class="hand-unknown">
+        <div style="background:#0a0a0a;padding:3px 6px;font-size:0.8em;color:#555;font-weight:700;">Next draw</div>
+        <div style="font-size:2.4em;padding:6px 0;">🂠</div>
+        <div style="color:#555;font-size:0.7em;padding:3px;background:#0a0a0a;">UNKNOWN</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Single shared overlay — populated by JS -->
+<div class="modal-overlay" id="card-modal" onclick="if(event.target===this)closeCard()">
+  <div id="modal-card-slot"></div>
+  <div id="modal-math-slot"></div>
+</div>
+
+<script>
+const CARDS = {
+  medusa: {
+    name: 'Medusa', art: '🐍', type: 'Creature', release: '🏛️', baseValue: -2,
+    border: '#5c6bc0', bg: '#1a237e', nameBg: '#0d1642', artGrad: 'linear-gradient(160deg,#283593,#1a237e)',
+    typeBg: '#0d1642', typeColor: '#90caf9', textBg: '#0a0e2e', flavorColor: '#7986cb', footerBg: '#0d1642', footerColor: '#5c6bc0',
+    flavor: '"Once beautiful, now a weapon. Don\'t look her in the eye."',
+    mods: [{ label: '+ Ambrosia (Item)', value: '+3', type: 'item' }],
+    total: 1
+  },
+  ares: {
+    name: 'Ares', art: '⚔️', type: 'Creature', release: '🏛️', baseValue: 6,
+    border: '#5c6bc0', bg: '#1a237e', nameBg: '#0d1642', artGrad: 'linear-gradient(160deg,#283593,#1a237e)',
+    typeBg: '#0d1642', typeColor: '#90caf9', textBg: '#0a0e2e', flavorColor: '#7986cb', footerBg: '#0d1642', footerColor: '#5c6bc0',
+    flavor: '"God of war. He doesn\'t need help."',
+    mods: [], total: 6
+  },
+  hermes: {
+    name: 'Hermes', art: '👟', type: 'Creature', release: '🏛️', baseValue: 4,
+    border: '#5c6bc0', bg: '#1a237e', nameBg: '#0d1642', artGrad: 'linear-gradient(160deg,#283593,#1a237e)',
+    typeBg: '#0d1642', typeColor: '#90caf9', textBg: '#0a0e2e', flavorColor: '#7986cb', footerBg: '#0d1642', footerColor: '#5c6bc0',
+    flavor: '"Fastest god alive. Also delivers packages."',
+    mods: [], total: 4
+  },
+  zeus: {
+    name: 'Zeus', art: '⚡', type: 'Creature', release: '🏛️', baseValue: 8,
+    border: '#5c6bc0', bg: '#1a237e', nameBg: '#0d1642', artGrad: 'linear-gradient(160deg,#283593,#1a237e)',
+    typeBg: '#0d1642', typeColor: '#90caf9', textBg: '#0a0e2e', flavorColor: '#7986cb', footerBg: '#0d1642', footerColor: '#5c6bc0',
+    flavor: '"King of the gods. His presence demands respect."',
+    mods: [{ label: '× Cyclone of Poseidon (Action)', value: '×2', type: 'action' }],
+    total: 16
+  },
+  athena: {
+    name: 'Athena', art: '🦉', type: 'Creature', release: '🏛️', baseValue: 5,
+    border: '#5c6bc0', bg: '#1a237e', nameBg: '#0d1642', artGrad: 'linear-gradient(160deg,#283593,#1a237e)',
+    typeBg: '#0d1642', typeColor: '#90caf9', textBg: '#0a0e2e', flavorColor: '#7986cb', footerBg: '#0d1642', footerColor: '#5c6bc0',
+    flavor: '"Goddess of wisdom. She always has a plan."',
+    mods: [], total: 5
+  },
+  nectar: {
+    name: 'Nectar', art: '🍯', type: 'Item', release: '🏛️', baseValue: '+5',
+    border: '#81c784', bg: '#1b5e20', nameBg: '#0a2e0e', artGrad: 'linear-gradient(160deg,#2e7d32,#1b5e20)',
+    typeBg: '#0a2e0e', typeColor: '#a5d6a7', textBg: '#071a09', flavorColor: '#81c784', footerBg: '#0a2e0e', footerColor: '#4caf50',
+    effect: 'Add +5 to one creature on the field.',
+    flavor: '"Sweeter than anything mortals have tasted. One sip changes everything."',
+    mods: [], total: null
+  },
+  thunderbolt: {
+    name: 'Thunderbolt', art: '⚡', type: 'Action', release: '🏛️', baseValue: '×10',
+    border: '#ce93d8', bg: '#4a148c', nameBg: '#1a0533', artGrad: 'linear-gradient(160deg,#6a1b9a,#4a148c)',
+    typeBg: '#1a0533', typeColor: '#ce93d8', textBg: '#0f0120', flavorColor: '#ce93d8', footerBg: '#1a0533', footerColor: '#ab47bc',
+    effect: 'Multiply one creature\'s value by 10.',
+    flavor: '"The sky splits. The earth shakes. Math happens."',
+    mods: [], total: null
+  }
+};
+
+const MOD_COLORS = {
+  item: { bg: '#2e7d32', color: '#a5d6a7' },
+  action: { bg: '#4a148c', color: '#ce93d8' },
+  event: { bg: '#7f0000', color: '#ef9a9a' }
+};
+
+function openCard(id) {
+  const c = CARDS[id];
+
+  // Build full card HTML
+  const valueDisplay = typeof c.baseValue === 'number'
+    ? `<span style="background:${c.baseValue < 0 ? '#c62828' : '#1565c0'};color:#fff;font-weight:900;font-size:1em;padding:2px 8px;border-radius:4px;">${c.baseValue}</span>`
+    : `<span style="background:#333;color:#fff;font-weight:900;font-size:1em;padding:2px 8px;border-radius:4px;">${c.baseValue}</span>`;
+
+  const effectLine = c.effect ? `<p class="effect" style="color:#ddd;margin:0 0 8px;">${c.effect}</p>` : '';
+
+  const cardHTML = `
+    <div style="width:220px;border-radius:14px;overflow:hidden;border:6px solid ${c.border};background:${c.bg};font-family:serif;flex-shrink:0;">
+      <div style="padding:7px 12px;background:${c.nameBg};display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:#fff;font-weight:700;font-size:1em;">${c.name}</span>
+        ${valueDisplay}
+      </div>
+      <div style="height:140px;background:${c.artGrad};display:flex;align-items:center;justify-content:center;font-size:5.5em;border-top:2px solid ${c.border};border-bottom:2px solid ${c.border};">${c.art}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:${c.typeBg};font-size:0.75em;color:${c.typeColor};font-style:italic;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span>${c.type}</span><span style="font-size:1.5em;">${c.release}</span>
+      </div>
+      <div style="padding:10px 12px;min-height:70px;background:${c.textBg};font-size:0.82em;">
+        ${effectLine}
+        <p style="color:${c.flavorColor};font-style:italic;margin:0;">${c.flavor}</p>
+      </div>
+      <div style="padding:5px 10px;background:${c.footerBg};font-size:0.65em;letter-spacing:1px;text-align:right;color:${c.footerColor};">R1</div>
+    </div>`;
+
+  // Build math panel (only if mods exist or it's a field creature)
+  let mathHTML = '';
+  if (c.mods !== undefined && (c.mods.length > 0 || (c.type === 'Creature' && c.total !== null))) {
+    const modRows = c.mods.map(m => {
+      const mc = MOD_COLORS[m.type];
+      return `<div class="math-row">
+        <span class="math-label" style="color:#888;">${m.label}</span>
+        <span style="background:${mc.bg};color:${mc.color};font-family:monospace;font-weight:700;padding:1px 8px;border-radius:4px;">${m.value}</span>
+      </div>`;
+    }).join('');
+
+    const noMods = c.mods.length === 0
+      ? `<div class="math-row"><span class="math-label" style="color:#555;font-style:italic;">No modifiers yet</span><span style="color:#555;">—</span></div>`
+      : '';
+
+    mathHTML = `
+      <div class="math-panel">
+        <h4>Math Breakdown</h4>
+        <div class="math-row">
+          <span class="math-label" style="color:#888;">Base value</span>
+          <span style="color:#fff;font-family:monospace;font-size:1.05em;">${c.baseValue}</span>
+        </div>
+        ${modRows}${noMods}
+        <div class="math-row total-row">
+          <span>Current total</span>
+          <span>${c.total}</span>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('modal-card-slot').innerHTML = cardHTML;
+  document.getElementById('modal-math-slot').innerHTML = mathHTML;
+  document.getElementById('card-modal').classList.add('open');
+}
+
+function closeCard() {
+  document.getElementById('card-modal').classList.remove('open');
+}
+</script>
+
+</body>
+</html>

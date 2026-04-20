@@ -1,0 +1,42 @@
+<h2>How should the game be architected?</h2>
+<p class="subtitle">This shapes how easy it is to add multiplayer later and how complex the build is now</p>
+
+<div class="options">
+  <div class="option" data-choice="client-heavy" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Client-Heavy</h3>
+      <p>Game state lives entirely in the browser. Supabase stores card definitions only. AI runs in-browser. Fast to build, works offline.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Simplest to build</li><li>No server costs</li><li>Works offline</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Multiplayer requires a full rewrite later</li><li>Card data exposed in client</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="server-auth" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Server-Authoritative</h3>
+      <p>Game state managed via Supabase Realtime + Next.js API routes from day one. Multiplayer-ready architecture.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Multiplayer drops in cleanly</li><li>Cheat-proof</li><li>Consistent state everywhere</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Significantly more complex upfront</li><li>Requires Supabase Realtime setup</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C — Recommended</div>
+    <div class="content">
+      <h3>Hybrid (Clean Interface)</h3>
+      <p>Cards & rules live in Supabase. Game state lives in browser now, behind a clean <code>GameEngine</code> interface that can move server-side later without touching UI code.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Fast to build now</li><li>Multiplayer upgrade path without rewrite</li><li>Card database ready from day one</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Slightly more upfront design</li><li>Still client-side state (not cheat-proof)</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">I recommend C — builds fast today, upgrades cleanly tomorrow. Click to confirm or choose another.</p>

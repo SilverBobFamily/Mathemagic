@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { background: #0d0d1a; color: #eee; font-family: sans-serif; padding: 20px; margin: 0; }
+  h2 { color: #fff; margin: 0 0 4px; }
+  .subtitle { color: #888; margin: 0 0 16px; font-size: 0.9em; }
+  .board { background: #0a0a1a; border-radius: 12px; overflow: hidden; border: 2px solid #333; }
+  .zone { padding: 12px 16px; border-bottom: 1px solid #333; }
+  .zone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .opponent-zone { background: #1a0a0a; }
+  .player-zone { background: #0a1a0a; }
+  .hand-zone { background: #0a0a14; }
+  .status-bar { background: #111; padding: 6px 16px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85em; color: #555; }
+  .field { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .field-card { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #5c6bc0; background: #1a237e; text-align: center; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .field-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(100,120,255,0.4); }
+  .field-card .name-bar { background: #0d1642; padding: 3px 6px; font-size: 0.8em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; }
+  .field-card .art { font-size: 2.4em; padding: 6px 0; }
+  .field-card .modifier-tag { font-size: 0.7em; padding: 2px 4px; font-weight: 700; }
+  .field-card .total { color: #aaa; font-size: 0.75em; padding: 3px; background: #111; }
+  .item-tag { background: #2e7d32; color: #a5d6a7; }
+  .action-tag { background: #4a148c; color: #ce93d8; }
+  .event-tag { background: #7f0000; color: #ef9a9a; }
+
+  .hand-card { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #ffd54f; text-align: center; cursor: pointer; box-shadow: 0 0 12px rgba(255,213,79,0.4); transition: transform 0.15s; }
+  .hand-card:hover { transform: translateY(-6px); box-shadow: 0 8px 24px rgba(255,213,79,0.5); }
+  .hand-card .name-bar { padding: 3px 6px; font-size: 0.8em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; }
+  .hand-card .art { font-size: 2.4em; padding: 6px 0; }
+  .hand-card .type-tag { font-size: 0.7em; padding: 3px; letter-spacing: 1px; }
+  .hand-unknown { width: 100px; border-radius: 8px; overflow: hidden; border: 3px solid #444; background: #111; text-align: center; opacity: 0.4; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+
+  /* Full card modal (hand cards) */
+  .full-card { width: 220px; border-radius: 14px; overflow: hidden; font-family: serif; cursor: default; }
+  .full-card .fc-name-bar { padding: 7px 12px; font-size: 1em; color: #fff; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .full-card .fc-art { height: 130px; display: flex; align-items: center; justify-content: center; font-size: 5em; }
+  .full-card .fc-type-line { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; font-size: 0.75em; font-style: italic; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .full-card .fc-text { padding: 10px 12px; min-height: 70px; font-size: 0.8em; }
+  .full-card .fc-text .effect { color: #ddd; margin: 0 0 8px; }
+  .full-card .fc-text .flavor { color: #999; font-style: italic; margin: 0; }
+  .full-card .fc-footer { padding: 5px 10px; font-size: 0.65em; letter-spacing: 1px; text-align: right; }
+
+  /* Math modal (field cards) */
+  .math-modal { background: #1a1a2e; border-radius: 16px; border: 2px solid #5c6bc0; padding: 24px; max-width: 320px; width: 90%; }
+  .math-modal h3 { margin: 0 0 4px; font-size: 1.3em; }
+  .math-modal .close-btn { float: right; background: none; border: 1px solid #555; color: #aaa; border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 0.85em; }
+  .math-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #222; font-size: 0.9em; }
+  .math-row:last-child { border-bottom: none; font-weight: 700; font-size: 1.05em; color: #ffd54f; }
+  .math-label { color: #aaa; }
+  .math-value { color: #fff; font-family: monospace; font-size: 1.1em; }
+  .flavor { font-style: italic; color: #666; font-size: 0.8em; margin-top: 12px; }
+
+  .close-overlay-btn { position: absolute; top: 20px; right: 20px; background: none; border: 1px solid #555; color: #aaa; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h2>Game Board Layout</h2>
+<p class="subtitle">Click field cards for math breakdown · Click hand cards to inspect the full card</p>
+
+<div class="board">
+  <div class="zone opponent-zone">
+    <div class="zone-header">
+      <span style="color:#ef9a9a;font-weight:700;font-size:1.1em;">⚔ Opponent</span>
+      <span style="color:#ef9a9a;">Score: <strong style="font-size:1.4em;">11</strong> &nbsp;·&nbsp; Cards left: 8</span>
+    </div>
+    <div class="field">
+      <div class="field-card" onclick="showMath('medusa')">
+        <div class="name-bar"><span>Medusa</span><span style="color:#ef9a9a;">-2</span></div>
+        <div class="art">🐍</div>
+        <div class="modifier-tag item-tag">+3 Ambrosia</div>
+        <div class="total">= 1</div>
+      </div>
+      <div class="field-card" onclick="showMath('ares')">
+        <div class="name-bar"><span>Ares</span><span>6</span></div>
+        <div class="art">⚔️</div>
+      </div>
+      <div class="field-card" onclick="showMath('hermes')">
+        <div class="name-bar"><span>Hermes</span><span>4</span></div>
+        <div class="art">👟</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span>Round 5 of 16 · Your turn</span>
+    <span style="color:#ffd54f;font-weight:700;">🏛️ Greek Mythology</span>
+    <span>Deck: Release 1 + 2</span>
+  </div>
+
+  <div class="zone player-zone">
+    <div class="zone-header">
+      <span style="color:#a5d6a7;font-weight:700;font-size:1.1em;">🧑 You</span>
+      <span style="color:#a5d6a7;">Score: <strong style="font-size:1.4em;">21</strong> &nbsp;·&nbsp; Cards left: 7</span>
+    </div>
+    <div class="field">
+      <div class="field-card" onclick="showMath('zeus')">
+        <div class="name-bar"><span>Zeus</span><span>8</span></div>
+        <div class="art">⚡</div>
+        <div class="modifier-tag action-tag">×2 Cyclone</div>
+        <div class="total">= 16</div>
+      </div>
+      <div class="field-card" onclick="showMath('athena')">
+        <div class="name-bar"><span>Athena</span><span>5</span></div>
+        <div class="art">🦉</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="zone hand-zone" style="border-bottom:none;">
+    <div style="color:#555;font-size:0.75em;margin-bottom:10px;letter-spacing:1px;">YOUR HAND — Click to inspect · Play by dragging or selecting a target</div>
+    <div class="field">
+      <div class="hand-card" style="background:#1b5e20;" onclick="showHandCard('nectar')">
+        <div class="name-bar" style="background:#0a2e0e;"><span>Nectar</span><span style="color:#a5d6a7;">+5</span></div>
+        <div class="art">🍯</div>
+        <div class="type-tag" style="background:#071a09;color:#a5d6a7;">ITEM</div>
+      </div>
+      <div class="hand-card" style="background:#4a148c;" onclick="showHandCard('thunderbolt')">
+        <div class="name-bar" style="background:#1a0533;"><span>Thunderbolt</span><span style="color:#ce93d8;">×10</span></div>
+        <div class="art">⚡</div>
+        <div class="type-tag" style="background:#0f0120;color:#ce93d8;">ACTION</div>
+      </div>
+      <div class="hand-unknown">
+        <div style="background:#0a0a0a;padding:3px 6px;font-size:0.8em;color:#555;font-weight:700;">Next draw</div>
+        <div style="font-size:2.4em;padding:6px 0;">🂠</div>
+        <div style="color:#555;font-size:0.7em;padding:3px;background:#0a0a0a;">UNKNOWN</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FIELD CARD MATH MODALS ── -->
+<div class="modal-overlay" id="modal-medusa" onclick="if(event.target===this)closeCard('medusa')">
+  <div class="math-modal">
+    <button class="close-btn" onclick="closeCard('medusa')">✕ close</button>
+    <h3>🐍 Medusa</h3>
+    <div style="color:#90caf9;font-size:0.8em;margin-bottom:12px;">Creature · 🏛️ Greek Mythology</div>
+    <div class="math-row"><span class="math-label">Base value</span><span class="math-value">-2</span></div>
+    <div class="math-row"><span class="math-label">+ Ambrosia (Item)</span><span class="math-value">+3</span></div>
+    <div class="math-row"><span class="math-label">Current total</span><span class="math-value">1</span></div>
+    <div class="flavor">"Once beautiful, now a weapon. Don't look her in the eye."</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ares" onclick="if(event.target===this)closeCard('ares')">
+  <div class="math-modal">
+    <button class="close-btn" onclick="closeCard('ares')">✕ close</button>
+    <h3>⚔️ Ares</h3>
+    <div style="color:#90caf9;font-size:0.8em;margin-bottom:12px;">Creature · 🏛️ Greek Mythology</div>
+    <div class="math-row"><span class="math-label">Base value</span><span class="math-value">6</span></div>
+    <div class="math-row"><span class="math-label">No modifiers applied</span><span class="math-value">—</span></div>
+    <div class="math-row"><span class="math-label">Current total</span><span class="math-value">6</span></div>
+    <div class="flavor">"God of war. He doesn't need help."</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-hermes" onclick="if(event.target===this)closeCard('hermes')">
+  <div class="math-modal">
+    <button class="close-btn" onclick="closeCard('hermes')">✕ close</button>
+    <h3>👟 Hermes</h3>
+    <div style="color:#90caf9;font-size:0.8em;margin-bottom:12px;">Creature · 🏛️ Greek Mythology</div>
+    <div class="math-row"><span class="math-label">Base value</span><span class="math-value">4</span></div>
+    <div class="math-row"><span class="math-label">No modifiers applied</span><span class="math-value">—</span></div>
+    <div class="math-row"><span class="math-label">Current total</span><span class="math-value">4</span></div>
+    <div class="flavor">"Fastest god alive. Also delivers packages."</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-zeus" onclick="if(event.target===this)closeCard('zeus')">
+  <div class="math-modal">
+    <button class="close-btn" onclick="closeCard('zeus')">✕ close</button>
+    <h3>⚡ Zeus</h3>
+    <div style="color:#90caf9;font-size:0.8em;margin-bottom:12px;">Creature · 🏛️ Greek Mythology</div>
+    <div class="math-row"><span class="math-label">Base value</span><span class="math-value">8</span></div>
+    <div class="math-row"><span class="math-label">× Cyclone of Poseidon (Action)</span><span class="math-value">×2</span></div>
+    <div class="math-row"><span class="math-label">Current total</span><span class="math-value">16</span></div>
+    <div class="flavor">"King of the gods. His presence demands respect."</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-athena" onclick="if(event.target===this)closeCard('athena')">
+  <div class="math-modal">
+    <button class="close-btn" onclick="closeCard('athena')">✕ close</button>
+    <h3>🦉 Athena</h3>
+    <div style="color:#90caf9;font-size:0.8em;margin-bottom:12px;">Creature · 🏛️ Greek Mythology</div>
+    <div class="math-row"><span class="math-label">Base value</span><span class="math-value">5</span></div>
+    <div class="math-row"><span class="math-label">No modifiers applied</span><span class="math-value">—</span></div>
+    <div class="math-row"><span class="math-label">Current total</span><span class="math-value">5</span></div>
+    <div class="flavor">"Goddess of wisdom. She always has a plan."</div>
+  </div>
+</div>
+
+<!-- ── HAND CARD FULL-VIEW MODALS ── -->
+<div class="modal-overlay" id="modal-nectar" onclick="if(event.target===this)closeCard('nectar')">
+  <button class="close-overlay-btn" onclick="closeCard('nectar')">✕ close</button>
+  <div class="full-card" style="border:6px solid #81c784;background:#1b5e20;">
+    <div class="fc-name-bar" style="background:#0a2e0e;">
+      <span>Nectar</span>
+      <span style="background:#2e7d32;color:#fff;font-weight:900;padding:2px 8px;border-radius:4px;">+5</span>
+    </div>
+    <div class="fc-art" style="background:linear-gradient(160deg,#2e7d32,#1b5e20);border-top:2px solid #388e3c;border-bottom:2px solid #388e3c;">🍯</div>
+    <div class="fc-type-line" style="background:#0a2e0e;color:#a5d6a7;">
+      <span>Item</span><span style="font-size:1.4em;">🏛️</span>
+    </div>
+    <div class="fc-text" style="background:#071a09;">
+      <p class="effect">Add +5 to one creature on the field.</p>
+      <p class="flavor">"Sweeter than anything mortals have tasted. One sip changes everything."</p>
+    </div>
+    <div class="fc-footer" style="background:#0a2e0e;color:#4caf50;">ITEM · R1</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-thunderbolt" onclick="if(event.target===this)closeCard('thunderbolt')">
+  <button class="close-overlay-btn" onclick="closeCard('thunderbolt')">✕ close</button>
+  <div class="full-card" style="border:6px solid #ce93d8;background:#4a148c;">
+    <div class="fc-name-bar" style="background:#1a0533;">
+      <span>Thunderbolt</span>
+      <span style="background:#6a1b9a;color:#fff;font-weight:900;padding:2px 8px;border-radius:4px;">×10</span>
+    </div>
+    <div class="fc-art" style="background:linear-gradient(160deg,#6a1b9a,#4a148c);border-top:2px solid #7b1fa2;border-bottom:2px solid #7b1fa2;">⚡</div>
+    <div class="fc-type-line" style="background:#1a0533;color:#ce93d8;">
+      <span>Action</span><span style="font-size:1.4em;">🏛️</span>
+    </div>
+    <div class="fc-text" style="background:#0f0120;">
+      <p class="effect">Multiply one creature's value by 10.</p>
+      <p class="flavor">"The sky splits. The earth shakes. Math happens."</p>
+    </div>
+    <div class="fc-footer" style="background:#1a0533;color:#ab47bc;">ACTION · R1</div>
+  </div>
+</div>
+
+<script>
+function showMath(id) { document.getElementById('modal-' + id).classList.add('open'); }
+function showHandCard(id) { document.getElementById('modal-' + id).classList.add('open'); }
+function closeCard(id) { document.getElementById('modal-' + id).classList.remove('open'); }
+</script>
+</body>
+</html>
