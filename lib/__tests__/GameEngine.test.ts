@@ -1,4 +1,4 @@
-import { computeCardValue, computeScore } from '../GameEngine';
+import { computeCardValue, computeScore, createGame, drawCard, endTurn, playCreature, isGameOver, playModifier, playEvent, getWinner } from '../GameEngine';
 import type { FieldCard, Card } from '../types';
 
 const makeCreature = (value: number): Card => ({
@@ -99,8 +99,6 @@ describe('computeScore', () => {
   });
 });
 
-import { createGame, drawCard, endTurn, playCreature, isGameOver } from '../GameEngine';
-import type { Card } from '../types';
 
 const makeDeck = (size: number): Card[] =>
   Array.from({ length: size }, (_, i) => ({
@@ -194,9 +192,6 @@ describe('isGameOver', () => {
   });
 });
 
-import { playModifier, playEvent, getWinner } from '../GameEngine';
-
-// Re-use helpers from top of file (makeCreature, makeModCard, makeDeck)
 
 describe('playModifier', () => {
   it('attaches item to target creature on player field', () => {
