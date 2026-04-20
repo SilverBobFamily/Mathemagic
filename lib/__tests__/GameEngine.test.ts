@@ -193,3 +193,111 @@ describe('isGameOver', () => {
     expect(isGameOver(over)).toBe(true);
   });
 });
+
+import { playModifier, playEvent, getWinner } from '../GameEngine';
+
+// Re-use helpers from top of file (makeCreature, makeModCard, makeDeck)
+
+describe('playModifier', () => {
+  it('attaches item to target creature on player field', () => {
+    let state = createGame(makeDeck(20), makeDeck(20));
+    // Play a creature to player field
+    const creatureId = state.player.hand[0].id;
+    state = playCreature(state, creatureId, 'player');
+
+    // Give opponent an item card in hand, switch turn
+    const itemCard: Card = {
+      id: 999, release_id: 1, name: 'TestItem', type: 'item',
+      value: null, operator: '+3', operator_value: 3,
+      effect_type: null, art_emoji: '🏺', art_url: null,
+      flavor_text: '', effect_text: null,
+    };
+    state = {
+      ...state,
+      turn: 'opponent',
+      opponent: { ...state.opponent, hand: [itemCard, ...state.opponent.hand] },
+    };
+
+    state = playModifier(state, itemCard.id, state.player.field[0].card.id, 'player');
+    expect(state.player.field[0].modifiers).toHaveLength(1);
+    expect(state.player.field[0].modifiers[0].card.id).toBe(999);
+    expect(state.opponent.playedCount).toBe(1);
+  });
+});
+
+describe('playEvent', () => {
+  it('zero_out sets zeroed flag', () => {
+    let state = createGame(makeDeck(20), makeDeck(20));
+    const creatureId = state.player.hand[0].id;
+    state = playCreature(state, creatureId, 'player');
+
+    const eventCard: Card = {
+      id: 998, release_id: 1, name: 'ZeroOut', type: 'event',
+      value: null, operator: null, operator_value: null,
+      effect_type: 'zero_out', art_emoji: '💀', art_url: null,
+      flavor_text: '', effect_text: null,
+    };
+    state = {
+      ...state,
+      turn: 'opponent',
+      opponent: { ...state.opponent, hand: [eventCard] },
+    };
+
+    state = playEvent(state, eventCard.id, state.player.field[0].card.id, 'player');
+    expect(state.player.field[0].zeroed).toBe(true);
+  });
+
+  it('banish removes creature from field', () => {
+    let state = createGame(makeDeck(20), makeDeck(20));
+    const creatureId = state.player.hand[0].id;
+    state = playCreature(state, creatureId, 'player');
+
+    const banishCard: Card = {
+      id: 997, release_id: 1, name: 'Banish', type: 'event',
+      value: null, operator: null, operator_value: null,
+      effect_type: 'banish', art_emoji: '⚰️', art_url: null,
+      flavor_text: '', effect_text: null,
+    };
+    state = {
+      ...state,
+      turn: 'opponent',
+      opponent: { ...state.opponent, hand: [banishCard] },
+    };
+
+    state = playEvent(state, banishCard.id, state.player.field[0].card.id, 'player');
+    expect(state.player.field).toHaveLength(0);
+  });
+});
+
+describe('getWinner', () => {
+  it('returns player when player score is higher', () => {
+    const base = createGame(makeDeck(20), makeDeck(20));
+    const state = {
+      ...base,
+      player: { ...base.player, field: [{ card: makeCreature(10), modifiers: [], zeroed: false }] },
+      opponent: { ...base.opponent, field: [{ card: makeCreature(1), modifiers: [], zeroed: false }] },
+    };
+    expect(getWinner(state)).toBe('player');
+  });
+
+  it('returns opponent when opponent score is higher', () => {
+    const base = createGame(makeDeck(20), makeDeck(20));
+    const state = {
+      ...base,
+      player: { ...base.player, field: [{ card: makeCreature(2), modifiers: [], zeroed: false }] },
+      opponent: { ...base.opponent, field: [{ card: makeCreature(9), modifiers: [], zeroed: false }] },
+    };
+    expect(getWinner(state)).toBe('opponent');
+  });
+
+  it('returns tie when scores are equal', () => {
+    const base = createGame(makeDeck(20), makeDeck(20));
+    const fc = { card: makeCreature(5), modifiers: [], zeroed: false };
+    const state = {
+      ...base,
+      player: { ...base.player, field: [fc] },
+      opponent: { ...base.opponent, field: [fc] },
+    };
+    expect(getWinner(state)).toBe('tie');
+  });
+});

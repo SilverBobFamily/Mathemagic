@@ -108,3 +108,145 @@ export function endTurn(state: GameState): GameState {
 export function isGameOver(state: GameState): boolean {
   return state.player.playedCount >= 16 && state.opponent.playedCount >= 16;
 }
+
+export function playModifier(
+  state: GameState,
+  cardId: number,
+  targetCreatureId: number,
+  targetSide: Side
+): GameState {
+  const currentPs = state[state.turn];
+  const cardIndex = currentPs.hand.findIndex(c => c.id === cardId);
+  if (cardIndex === -1) return state;
+  const card = currentPs.hand[cardIndex];
+  const newHand = currentPs.hand.filter((_, i) => i !== cardIndex);
+
+  const targetPs = state[targetSide];
+  const newField = targetPs.field.map(fc =>
+    fc.card.id === targetCreatureId
+      ? { ...fc, modifiers: [...fc.modifiers, { card }] }
+      : fc
+  );
+
+  return {
+    ...state,
+    [state.turn]: { ...currentPs, hand: newHand, playedCount: currentPs.playedCount + 1 },
+    [targetSide]: { ...targetPs, field: newField },
+  };
+}
+
+export function playEvent(
+  state: GameState,
+  cardId: number,
+  targetCreatureId: number,
+  targetSide: Side,
+  secondTargetId?: number,
+  secondTargetSide?: Side
+): GameState {
+  const currentPs = state[state.turn];
+  const cardIndex = currentPs.hand.findIndex(c => c.id === cardId);
+  if (cardIndex === -1) return state;
+  const card = currentPs.hand[cardIndex];
+  const newHand = currentPs.hand.filter((_, i) => i !== cardIndex);
+  let s: GameState = {
+    ...state,
+    [state.turn]: { ...currentPs, hand: newHand, playedCount: currentPs.playedCount + 1 },
+  };
+
+  const effect = card.effect_type;
+
+  if (effect === 'zero_out') {
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc =>
+          fc.card.id === targetCreatureId ? { ...fc, zeroed: true } : fc
+        ),
+      },
+    };
+  } else if (effect === 'banish') {
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.filter(fc => fc.card.id !== targetCreatureId),
+      },
+    };
+  } else if (effect === 'x100') {
+    const modCard: Card = { ...card, operator_value: 100 };
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc =>
+          fc.card.id === targetCreatureId
+            ? { ...fc, modifiers: [...fc.modifiers, { card: modCard }] }
+            : fc
+        ),
+      },
+    };
+  } else if (effect === 'mirror' && secondTargetId !== undefined && secondTargetSide !== undefined) {
+    const srcFc = s[targetSide].field.find(fc => fc.card.id === targetCreatureId);
+    if (srcFc) {
+      const srcValue = computeCardValue(srcFc);
+      const mirrorMod: Card = { ...card, operator_value: srcValue, type: 'item' };
+      const tPs = s[secondTargetSide];
+      s = {
+        ...s,
+        [secondTargetSide]: {
+          ...tPs,
+          field: tPs.field.map(fc =>
+            fc.card.id === secondTargetId
+              ? { ...fc, modifiers: [...fc.modifiers, { card: mirrorMod }] }
+              : fc
+          ),
+        },
+      };
+    }
+  } else if (effect === 'swap' && secondTargetId !== undefined && secondTargetSide !== undefined) {
+    const srcPs = s[targetSide];
+    const tgtPs = s[secondTargetSide];
+    const srcFc = srcPs.field.find(fc => fc.card.id === targetCreatureId)!;
+    const tgtFc = tgtPs.field.find(fc => fc.card.id === secondTargetId)!;
+    if (srcFc && tgtFc) {
+      s = {
+        ...s,
+        [targetSide]: {
+          ...srcPs,
+          field: srcPs.field.map(fc => fc.card.id === targetCreatureId ? tgtFc : fc),
+        },
+        [secondTargetSide]: {
+          ...tgtPs,
+          field: tgtPs.field.map(fc => fc.card.id === secondTargetId ? srcFc : fc),
+        },
+      };
+    }
+  } else if (effect === 'reverse') {
+    const reverseModCard: Card = { ...card, operator_value: -1, type: 'action' };
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc => ({
+          ...fc,
+          modifiers: [...fc.modifiers, { card: reverseModCard }],
+        })),
+      },
+    };
+  }
+
+  return s;
+}
+
+export function getWinner(state: GameState): Side | 'tie' {
+  const p = computeScore(state.player.field);
+  const o = computeScore(state.opponent.field);
+  if (p > o) return 'player';
+  if (o > p) return 'opponent';
+  return 'tie';
+}
