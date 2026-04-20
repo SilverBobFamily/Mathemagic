@@ -30,7 +30,7 @@ describe('computeCardValue', () => {
     expect(computeCardValue(fc)).toBe(7);
   });
 
-  it('applies item first, then action', () => {
+  it('applies item then action in play order', () => {
     const fc: FieldCard = {
       card: makeCreature(4),
       modifiers: [

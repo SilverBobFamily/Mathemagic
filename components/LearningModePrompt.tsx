@@ -54,7 +54,7 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect 
               {modifierCard.type === 'item' ? 'Add' : 'Multiply by'} ({modifierCard.name})
             </span>
             <span style={{ color: modifierCard.type === 'item' ? '#a5d6a7' : '#ce93d8', fontFamily: 'monospace' }}>
-              {modifierCard.operator ?? modifierCard.operator_value}
+              {(modifierCard.operator ?? String(modifierCard.operator_value ?? '')).replace('÷', '/')}
             </span>
           </div>
         </div>

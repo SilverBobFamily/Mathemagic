@@ -42,7 +42,7 @@ export default function FieldCard({ fieldCard, onClick, highlighted }: Props) {
         const colors = MOD_COLORS[mod.card.type as keyof typeof MOD_COLORS] ?? MOD_COLORS.item;
         return (
           <div key={i} style={{ background: colors.bg, color: colors.color, fontSize: '0.65em', padding: '2px 4px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {mod.card.operator ?? mod.card.effect_type} {mod.card.name}
+            {(mod.card.operator ?? mod.card.effect_type ?? '').replace('÷', '/')} {mod.card.name}
           </div>
         );
       })}

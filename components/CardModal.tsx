@@ -10,9 +10,10 @@ interface Props {
   handCard?: Card;
   releaseNumber?: number;
   onClose: () => void;
+  onPlay?: () => void;
 }
 
-export default function CardModal({ fieldCard, handCard, releaseNumber, onClose }: Props) {
+export default function CardModal({ fieldCard, handCard, releaseNumber, onClose, onPlay }: Props) {
   const card = fieldCard?.card ?? handCard!;
 
   useEffect(() => {
@@ -29,7 +30,22 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose 
         zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24,
       }}
     >
-      <CardComponent card={card} releaseNumber={releaseNumber} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <CardComponent card={card} releaseNumber={releaseNumber} />
+        {onPlay && (
+          <button
+            onClick={onPlay}
+            style={{
+              background: '#1a237e', color: '#fff', border: '2px solid #5c6bc0',
+              borderRadius: 8, padding: '10px 24px', fontSize: '1em',
+              cursor: 'pointer', fontFamily: "'Cinzel', serif", fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ▶ Play This Card
+          </button>
+        )}
+      </div>
 
       {fieldCard && (
         <div style={{ background: '#12122a', border: '2px solid #2a2a5a', borderRadius: 12, padding: '16px 20px', minWidth: 200, maxWidth: 260 }}>
@@ -44,7 +60,7 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose 
                 {mod.card.type === 'item' ? '+' : '×'} {mod.card.name}
               </span>
               <span style={{ color: '#fff', fontFamily: 'monospace', background: mod.card.type === 'item' ? '#2e7d32' : '#4a148c', padding: '1px 8px', borderRadius: 4, fontSize: '0.9em' }}>
-                {mod.card.operator ?? mod.card.operator_value ?? mod.card.effect_type}
+                {(mod.card.operator ?? String(mod.card.operator_value ?? mod.card.effect_type ?? '')).replace('÷', '/')}
               </span>
             </div>
           ))}

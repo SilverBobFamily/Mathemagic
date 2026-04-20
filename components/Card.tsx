@@ -46,14 +46,14 @@ export default function Card({ card, releaseNumber }: Props) {
   const displayValue =
     card.type === 'creature' ? String(card.value ?? 0) :
     card.type === 'event' ? 'EVENT' :
-    (card.operator ?? '');
+    (card.operator ?? '').replace('÷', '/');
   const valueColor = card.type === 'creature' && (card.value ?? 0) < 0 ? '#ef5350' : '#90caf9';
 
   return (
     <div style={{ width: 220, borderRadius: 14, overflow: 'hidden', border: `6px solid ${s.border}`, background: s.bg, fontFamily: 'serif', flexShrink: 0 }}>
       {/* Name bar */}
       <div style={{ padding: '7px 12px', background: s.nameBg, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: '1em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{card.name}</span>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: '1em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140, fontFamily: "'Cinzel', serif" }}>{card.name}</span>
         <span style={{ background: card.type === 'event' ? '#b71c1c' : 'rgba(0,0,0,0.4)', color: valueColor, fontWeight: 900, fontSize: '0.9em', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}>
           {displayValue}
         </span>
@@ -65,14 +65,14 @@ export default function Card({ card, releaseNumber }: Props) {
           : card.art_emoji}
       </div>
       {/* Type line */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: s.typeBg, fontSize: '0.75em', color: s.typeColor, fontStyle: 'italic', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 10px', background: s.typeBg, fontSize: '0.75em', color: s.typeColor, fontStyle: 'italic', borderBottom: '1px solid rgba(255,255,255,0.1)', fontFamily: "'Cinzel', serif" }}>
         <span style={{ textTransform: 'capitalize' }}>{card.type}</span>
         <span style={{ fontSize: '1.4em' }}>{card.release?.icon ?? ''}</span>
       </div>
       {/* Text box */}
       <div style={{ padding: '10px 12px', minHeight: 70, background: s.textBg, fontSize: '0.82em' }}>
         {card.effect_text && <p style={{ color: '#ddd', margin: '0 0 8px' }}>{card.effect_text}</p>}
-        <p style={{ color: s.flavorColor, fontStyle: 'italic', margin: 0 }}>{card.flavor_text}</p>
+        <p style={{ color: s.flavorColor, fontStyle: 'italic', margin: 0, fontFamily: "'Crimson Text', serif" }}>{card.flavor_text}</p>
       </div>
       {/* Footer */}
       <div style={{ padding: '5px 10px', background: s.footerBg, fontSize: '0.65em', letterSpacing: 1, textAlign: 'right', color: s.footerColor }}>
