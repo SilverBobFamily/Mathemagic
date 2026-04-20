@@ -98,3 +98,98 @@ describe('computeScore', () => {
     expect(computeScore(cards)).toBe(11); // 4×2 + 3
   });
 });
+
+import { createGame, drawCard, endTurn, playCreature, isGameOver } from '../GameEngine';
+import type { Card } from '../types';
+
+const makeDeck = (size: number): Card[] =>
+  Array.from({ length: size }, (_, i) => ({
+    id: 100 + i,
+    release_id: 1,
+    name: `Card${i}`,
+    type: 'creature' as const,
+    value: (i % 11) - 5,
+    operator: null,
+    operator_value: null,
+    effect_type: null,
+    art_emoji: '⚡',
+    art_url: null,
+    flavor_text: '',
+    effect_text: null,
+  }));
+
+describe('createGame', () => {
+  it('deals 3 cards to each hand', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(state.player.hand).toHaveLength(3);
+    expect(state.opponent.hand).toHaveLength(3);
+  });
+
+  it('sets aside 4 cards, leaving 13 in deck', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(state.player.aside).toHaveLength(4);
+    expect(state.player.deck).toHaveLength(13);
+  });
+
+  it('starts on player turn, round 1, phase playing', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(state.turn).toBe('player');
+    expect(state.round).toBe(1);
+    expect(state.phase).toBe('playing');
+  });
+});
+
+describe('playCreature', () => {
+  it('moves card from player hand to player field', () => {
+    let state = createGame(makeDeck(20), makeDeck(20));
+    const cardId = state.player.hand[0].id;
+    state = playCreature(state, cardId, 'player');
+    expect(state.player.field).toHaveLength(1);
+    expect(state.player.field[0].card.id).toBe(cardId);
+    expect(state.player.hand).toHaveLength(2);
+    expect(state.player.playedCount).toBe(1);
+  });
+
+  it('can play a creature on the opponent side', () => {
+    let state = createGame(makeDeck(20), makeDeck(20));
+    const cardId = state.player.hand[0].id;
+    state = playCreature(state, cardId, 'opponent');
+    expect(state.opponent.field).toHaveLength(1);
+    expect(state.player.hand).toHaveLength(2);
+  });
+});
+
+describe('endTurn', () => {
+  it('switches turn from player to opponent', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(endTurn(state).turn).toBe('opponent');
+  });
+
+  it('draws a card for the next player', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const before = state.opponent.hand.length;
+    const next = endTurn(state);
+    expect(next.opponent.hand).toHaveLength(before + 1);
+  });
+
+  it('increments round', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(endTurn(state).round).toBe(2);
+  });
+});
+
+describe('isGameOver', () => {
+  it('returns false while cards remain', () => {
+    expect(isGameOver(createGame(makeDeck(20), makeDeck(20)))).toBe(false);
+  });
+
+  it('returns true when both players have played 16 cards', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const over = {
+      ...state,
+      player: { ...state.player, playedCount: 16 },
+      opponent: { ...state.opponent, playedCount: 16 },
+    };
+    expect(isGameOver(over)).toBe(true);
+  });
+});
