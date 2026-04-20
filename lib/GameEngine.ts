@@ -48,7 +48,7 @@ function makePlayerState(deck: Card[]): PlayerState {
   };
 }
 
-export function createGame(playerDeck: Card[], opponentDeck: Card[]): GameState {
+export function createGame(playerDeck: Card[], opponentDeck: Card[], learningMode = false): GameState {
   return {
     phase: 'playing',
     turn: 'player',
@@ -57,7 +57,16 @@ export function createGame(playerDeck: Card[], opponentDeck: Card[]): GameState 
     opponent: makePlayerState(opponentDeck),
     winner: null,
     pendingCard: null,
+    learningMode,
   };
+}
+
+export function computeExpectedValue(fc: FieldCard, newModifierCard: Card): number {
+  const withMod: FieldCard = {
+    ...fc,
+    modifiers: [...fc.modifiers, { card: newModifierCard }],
+  };
+  return computeCardValue(withMod);
 }
 
 export function drawCard(state: GameState, side: Side): GameState {

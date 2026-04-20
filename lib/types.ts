@@ -53,4 +53,5 @@ export interface GameState {
   opponent: PlayerState;
   winner: Side | 'tie' | null;
   pendingCard: Card | null;       // card selected from hand, waiting for target
+  learningMode: boolean;
 }

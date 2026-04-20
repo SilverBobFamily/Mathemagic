@@ -5,6 +5,7 @@ import type { GameState, Card, FieldCard as FieldCardType, Side } from '@/lib/ty
 import { computeScore, playCreature, playModifier, playEvent, endTurn, isGameOver, getWinner } from '@/lib/GameEngine';
 import FieldCardComponent from './FieldCard';
 import CardModal from './CardModal';
+import LearningModePrompt from './LearningModePrompt';
 
 interface Props {
   state: GameState;
@@ -16,6 +17,11 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   const [modalData, setModalData] = useState<{ fieldCard?: FieldCardType; handCard?: Card } | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [firstEventTarget, setFirstEventTarget] = useState<{ creatureId: number; side: Side } | null>(null);
+  const [learningCheck, setLearningCheck] = useState<{
+    fieldCard: FieldCardType;
+    modifierCard: Card;
+    onConfirm: () => void;
+  } | null>(null);
 
   const playerScore = computeScore(state.player.field);
   const opponentScore = computeScore(state.opponent.field);
@@ -43,6 +49,19 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
     }
 
     if (selectedCard.type === 'item' || selectedCard.type === 'action') {
+      if (state.learningMode) {
+        const capturedCard = selectedCard;
+        setLearningCheck({
+          fieldCard: fc,
+          modifierCard: capturedCard,
+          onConfirm: () => {
+            onStateChange(playModifier(state, capturedCard.id, fc.card.id, side));
+            setSelectedCard(null);
+            setLearningCheck(null);
+          },
+        });
+        return;
+      }
       onStateChange(playModifier(state, selectedCard.id, fc.card.id, side));
       setSelectedCard(null);
       return;
@@ -65,7 +84,25 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
         setFirstEventTarget(null);
         return;
       }
-      // Single-target events
+      // Single-target events that produce a calculable value (x100, reverse)
+      if (state.learningMode && (effect === 'x100' || effect === 'reverse')) {
+        const capturedCard = selectedCard;
+        // Build a synthetic modifier card so computeExpectedValue can calculate it
+        const syntheticMod: Card = effect === 'x100'
+          ? { ...capturedCard, operator_value: 100, type: 'action' }
+          : { ...capturedCard, operator_value: -1, type: 'action' };
+        setLearningCheck({
+          fieldCard: fc,
+          modifierCard: syntheticMod,
+          onConfirm: () => {
+            onStateChange(playEvent(state, capturedCard.id, fc.card.id, side));
+            setSelectedCard(null);
+            setLearningCheck(null);
+          },
+        });
+        return;
+      }
+      // Single-target events (no learning check: zero_out, banish, or non-learning mode)
       onStateChange(playEvent(state, selectedCard.id, fc.card.id, side));
       setSelectedCard(null);
       return;
@@ -227,6 +264,15 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
           handCard={modalData.handCard}
           releaseNumber={modalData.fieldCard?.card.release?.number ?? modalData.handCard?.release?.number}
           onClose={() => setModalData(null)}
+        />
+      )}
+
+      {/* Learning Mode Prompt */}
+      {learningCheck && (
+        <LearningModePrompt
+          fieldCard={learningCheck.fieldCard}
+          modifierCard={learningCheck.modifierCard}
+          onCorrect={learningCheck.onConfirm}
         />
       )}
     </div>

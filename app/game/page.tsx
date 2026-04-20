@@ -13,6 +13,7 @@ export default function GamePage() {
   const [state, setState] = useState<GameState | null>(null);
   const [mode, setMode] = useState<Mode>('ai');
   const [loading, setLoading] = useState(true);
+  const [learningMode, setLearningMode] = useState(false);
 
   useEffect(() => {
     fetchAllCards().then(c => { setCards(c); setLoading(false); });
@@ -24,7 +25,7 @@ export default function GamePage() {
     const playerDeck = shuffled.slice(0, 20);
     const opponentDeck = shuffled.slice(20, 40);
     setMode(m);
-    setState(createGame(playerDeck, opponentDeck));
+    setState(createGame(playerDeck, opponentDeck, learningMode));
   }, [cards]);
 
   // AI auto-play
@@ -66,6 +67,15 @@ export default function GamePage() {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
         <h1 style={{ color: '#fff', fontSize: '2em', margin: 0 }}>Choose Game Mode</h1>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#aaa', fontSize: '0.95em' }}>
+          <input
+            type="checkbox"
+            checked={learningMode}
+            onChange={e => setLearningMode(e.target.checked)}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          🧮 Learning Mode (answer math questions when playing modifiers)
+        </label>
         <div style={{ display: 'flex', gap: 16 }}>
           <button
             onClick={() => startGame('ai')}
