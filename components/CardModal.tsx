@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import type { FieldCard as FieldCardType, Card } from '@/lib/types';
 import { computeCardValue } from '@/lib/GameEngine';
 import CardComponent from './Card';
+import { useWindowWidth } from '@/hooks/useWindowWidth';
 
 interface Props {
   fieldCard?: FieldCardType;
@@ -15,6 +16,10 @@ interface Props {
 
 export default function CardModal({ fieldCard, handCard, releaseNumber, onClose, onPlay }: Props) {
   const card = fieldCard?.card ?? handCard!;
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 640;
+  // Card component renders at fixed 220px; scale down on mobile
+  const cardScale = isMobile ? 180 / 220 : 1;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -26,12 +31,24 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose,
     <div
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-        zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24,
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)',
+        zIndex: 100,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: isMobile ? 12 : 24,
+        flexDirection: isMobile ? 'column' : 'row',
+        padding: isMobile ? '20px 16px' : '0',
+        overflowY: 'auto',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <CardComponent card={card} releaseNumber={releaseNumber} />
+        <div style={{
+          transformOrigin: 'top center',
+          transform: `scale(${cardScale})`,
+          // Compensate for the layout space the unscaled card occupies
+          marginBottom: isMobile ? `${Math.round((220 - 180) * -0.8)}px` : '0',
+        }}>
+          <CardComponent card={card} releaseNumber={releaseNumber} />
+        </div>
         {onPlay && (
           <button
             onClick={onPlay}
@@ -48,7 +65,13 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose,
       </div>
 
       {fieldCard && (
-        <div style={{ background: '#12122a', border: '2px solid #2a2a5a', borderRadius: 12, padding: '16px 20px', minWidth: 200, maxWidth: 260 }}>
+        <div style={{
+          background: '#12122a', border: '2px solid #2a2a5a', borderRadius: 12,
+          padding: '16px 20px',
+          width: isMobile ? '100%' : 'auto',
+          minWidth: isMobile ? 'unset' : 200,
+          maxWidth: isMobile ? '100%' : 260,
+        }}>
           <h4 style={{ margin: '0 0 12px', color: '#90caf9', fontSize: '0.85em', letterSpacing: 1, textTransform: 'uppercase' }}>Math Breakdown</h4>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e1e3a', fontSize: '0.9em' }}>
             <span style={{ color: '#888' }}>Base value</span>

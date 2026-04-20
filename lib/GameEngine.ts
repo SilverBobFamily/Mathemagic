@@ -29,7 +29,14 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function makePlayerState(deck: Card[]): PlayerState {
-  const shuffled = shuffle(deck);
+  const hasCreatures = deck.some(c => c.type === 'creature');
+  let shuffled = shuffle(deck);
+  // Guarantee at least one creature in the opening hand (positions 4–6 after aside)
+  if (hasCreatures) {
+    while (!shuffled.slice(4, 7).some(c => c.type === 'creature')) {
+      shuffled = shuffle(deck);
+    }
+  }
   return {
     aside: shuffled.slice(0, 4),
     hand: shuffled.slice(4, 7),
@@ -115,22 +122,30 @@ export function playModifier(
   targetCreatureId: number,
   targetSide: Side
 ): GameState {
-  const currentPs = state[state.turn];
+  const currentSide = state.turn;
+  const currentPs = state[currentSide];
   const cardIndex = currentPs.hand.findIndex(c => c.id === cardId);
   if (cardIndex === -1) return state;
   const card = currentPs.hand[cardIndex];
   const newHand = currentPs.hand.filter((_, i) => i !== cardIndex);
 
-  const targetPs = state[targetSide];
+  // Build updated player state first (hand removal + playedCount)
+  const updatedCurrentPs = { ...currentPs, hand: newHand, playedCount: currentPs.playedCount + 1 };
+
+  // When targeting own side, read field from the already-updated state to avoid spread collision
+  const targetPs = currentSide === targetSide ? updatedCurrentPs : state[targetSide];
   const newField = targetPs.field.map(fc =>
     fc.card.id === targetCreatureId
       ? { ...fc, modifiers: [...fc.modifiers, { card }] }
       : fc
   );
 
+  if (currentSide === targetSide) {
+    return { ...state, [currentSide]: { ...updatedCurrentPs, field: newField } };
+  }
   return {
     ...state,
-    [state.turn]: { ...currentPs, hand: newHand, playedCount: currentPs.playedCount + 1 },
+    [currentSide]: updatedCurrentPs,
     [targetSide]: { ...targetPs, field: newField },
   };
 }

@@ -8,36 +8,41 @@ const MOD_COLORS = {
   event:  { bg: '#7f0000', color: '#ef9a9a' },
 };
 
+const SIZE_WIDTH: Record<'sm' | 'md' | 'lg', number> = { sm: 80, md: 100, lg: 130 };
+
 interface Props {
   fieldCard: FieldCardType;
   onClick: () => void;
   highlighted?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export default function FieldCard({ fieldCard, onClick, highlighted }: Props) {
+export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md' }: Props) {
   const { card, modifiers, zeroed } = fieldCard;
   const total = computeCardValue(fieldCard);
   const hasModifiers = modifiers.length > 0 || zeroed;
   const valueColor = (card.value ?? 0) < 0 ? '#ef9a9a' : '#fff';
+  const cardWidth = SIZE_WIDTH[size];
 
   return (
     <div
       onClick={onClick}
       style={{
-        width: 100, borderRadius: 8, overflow: 'hidden',
+        width: cardWidth, borderRadius: 8, overflow: 'hidden',
         border: `3px solid ${highlighted ? '#ffd54f' : '#5c6bc0'}`,
         background: '#1a237e', textAlign: 'center', cursor: 'pointer',
         transition: 'transform 0.15s, box-shadow 0.15s',
         boxShadow: highlighted ? '0 0 12px rgba(255,213,79,0.6)' : 'none',
+        flexShrink: 0,
       }}
       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
     >
       <div style={{ background: '#0d1642', padding: '3px 6px', fontSize: '0.8em', color: '#fff', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{card.name}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: cardWidth - 28 }}>{card.name}</span>
         <span style={{ color: valueColor }}>{card.value}</span>
       </div>
-      <div style={{ fontSize: '2.4em', padding: '6px 0' }}>{card.art_emoji}</div>
+      <div style={{ fontSize: size === 'lg' ? '2.8em' : '2.2em', padding: '6px 0' }}>{card.art_emoji}</div>
       {modifiers.map((mod, i) => {
         const colors = MOD_COLORS[mod.card.type as keyof typeof MOD_COLORS] ?? MOD_COLORS.item;
         return (

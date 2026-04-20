@@ -101,7 +101,7 @@ export default function GamePage() {
   }
 
   return (
-    <div style={{ padding: '16px 20px', maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ padding: '16px 24px', maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ color: '#555', fontSize: '0.85em' }}>
           Mode: {mode === 'ai' ? '⚔ vs AI' : '👥 Pass & Play'}
