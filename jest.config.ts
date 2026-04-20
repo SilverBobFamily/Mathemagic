@@ -7,6 +7,7 @@ const config: Config = {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       tsconfig: {
         jsx: 'react-jsx',
+        moduleResolution: 'node',
       },
     }],
   },
