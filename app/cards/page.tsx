@@ -1,0 +1,50 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { fetchReleases, fetchCardsByRelease } from '@/lib/supabase';
+import type { Release, Card } from '@/lib/types';
+import CardComponent from '@/components/Card';
+
+export default function CardsPage() {
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [selected, setSelected] = useState<Release | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
+
+  useEffect(() => {
+    fetchReleases().then(r => { setReleases(r); setSelected(r[0] ?? null); });
+  }, []);
+
+  useEffect(() => {
+    if (selected) fetchCardsByRelease(selected.id).then(setCards);
+  }, [selected]);
+
+  return (
+    <div style={{ padding: '24px 28px' }}>
+      <h1 style={{ color: '#fff', marginTop: 0, marginBottom: 20 }}>Card Browser</h1>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
+        {releases.map(r => (
+          <button
+            key={r.id}
+            onClick={() => setSelected(r)}
+            style={{
+              background: selected?.id === r.id ? r.color_hex : '#111',
+              color: '#fff', border: `2px solid ${r.color_hex}`,
+              borderRadius: 8, padding: '8px 16px', cursor: 'pointer',
+              fontSize: '0.95em', fontWeight: selected?.id === r.id ? 700 : 400,
+            }}
+          >
+            {r.icon} {r.name}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        {cards.map(card => (
+          <CardComponent
+            key={card.id}
+            card={{ ...card, release: selected ?? undefined }}
+            releaseNumber={selected?.number}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
