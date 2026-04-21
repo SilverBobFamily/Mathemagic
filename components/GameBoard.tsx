@@ -5,15 +5,17 @@ import { computeScore, playCreature, playModifier, playEvent, endTurn, passTurn,
 import FieldCardComponent from './FieldCard';
 import CardModal from './CardModal';
 import LearningModePrompt from './LearningModePrompt';
+import GameOverScreen from './GameOverScreen';
 import { useWindowWidth } from '@/hooks/useWindowWidth';
 
 interface Props {
   state: GameState;
   onStateChange: (s: GameState) => void;
   mode: 'ai' | 'pass-and-play';
+  onNewGame: () => void;
 }
 
-export default function GameBoard({ state, onStateChange, mode }: Props) {
+export default function GameBoard({ state, onStateChange, mode, onNewGame }: Props) {
   const [modalData, setModalData] = useState<{ fieldCard?: FieldCardType; handCard?: Card } | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [firstEventTarget, setFirstEventTarget] = useState<{ creatureId: number; side: Side } | null>(null);
@@ -227,13 +229,9 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
       {/* Status bar */}
       <div style={{ background: '#111', padding: '7px 18px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85em', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ color: '#555' }}>Round {state.round} · {isMyTurn ? 'Your turn' : "Opponent's turn"}</span>
-        {gameOver ? (
-          <span style={{ color: winner === 'player' ? '#a5d6a7' : winner === 'opponent' ? '#ef9a9a' : '#ffd54f', fontWeight: 700, fontFamily: "'Cinzel', serif" }}>
-            {winner === 'player' ? '🎉 You win!' : winner === 'opponent' ? '💀 Opponent wins' : '🤝 Tie!'}
-          </span>
-        ) : instructionText ? (
+        {!gameOver && instructionText && (
           <span style={{ color: '#ffd54f', fontWeight: 600 }}>{instructionText}</span>
-        ) : null}
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
           {selectedCard && isMyTurn && (
             <button
@@ -364,6 +362,15 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
           modifierCard={learningCheck.modifierCard}
           onCorrect={learningCheck.onConfirm}
           onDismiss={() => setLearningCheck(null)}
+        />
+      )}
+
+      {gameOver && winner && (
+        <GameOverScreen
+          winner={winner}
+          playerScore={playerScore}
+          opponentScore={opponentScore}
+          onNewGame={onNewGame}
         />
       )}
     </div>

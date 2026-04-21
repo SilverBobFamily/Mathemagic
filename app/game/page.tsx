@@ -114,7 +114,7 @@ export default function GamePage() {
           ← New Game
         </button>
       </div>
-      <GameBoard state={state} onStateChange={setState} mode={mode} />
+      <GameBoard state={state} onStateChange={setState} mode={mode} onNewGame={() => setState(null)} />
     </div>
   );
 }
