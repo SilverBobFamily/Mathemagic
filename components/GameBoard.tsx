@@ -31,8 +31,8 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   const dragStarted = useRef(false);
 
   const windowWidth = useWindowWidth();
-  const sizeTier: 'sm' | 'md' | 'lg' = windowWidth >= 900 ? 'lg' : windowWidth >= 640 ? 'md' : 'sm';
-  const handCardWidth = windowWidth >= 900 ? 120 : windowWidth >= 640 ? 100 : 80;
+  const sizeTier: 'sm' | 'md' | 'lg' = windowWidth >= 1100 ? 'lg' : windowWidth >= 700 ? 'md' : 'sm';
+  const handCardWidth = windowWidth >= 1100 ? 160 : windowWidth >= 700 ? 110 : 85;
 
   const playerScore = computeScore(state.player.field);
   const opponentScore = computeScore(state.opponent.field);
@@ -67,9 +67,9 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   }, []);
 
   const handleDragEnd = useCallback(() => {
+    dragStarted.current = false;
     draggedCardRef.current = null;
     setDraggedCard(null);
-    requestAnimationFrame(() => { dragStarted.current = false; });
   }, []);
 
   const handleDropOnZone = useCallback((side: Side) => {
@@ -194,7 +194,7 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   });
 
   return (
-    <div style={{ background: '#0a0a1a', borderRadius: 12, overflow: 'hidden', border: '2px solid #333', fontFamily: "'Crimson Text', serif", fontSize: '0.9em', color: '#eee' }}>
+    <div style={{ background: '#0a0a1a', borderRadius: 12, overflow: 'hidden', border: '2px solid #333', fontFamily: "'Crimson Text', serif", fontSize: sizeTier === 'lg' ? '1.05em' : '0.95em', color: '#eee' }}>
 
       {/* Opponent zone */}
       <div style={{ background: '#1a0a0a', padding: '14px 18px', borderBottom: '1px solid #333' }}>
@@ -347,7 +347,7 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: handCardWidth - 30 }}>{card.name}</span>
                   <span>{card.value ?? (card.operator ?? '').replace('÷', '/') ?? 'EVT'}</span>
                 </div>
-                <div style={{ fontSize: sizeTier === 'lg' ? '2.8em' : '2.2em', padding: '6px 0' }}>{card.art_emoji}</div>
+                <div style={{ fontSize: sizeTier === 'lg' ? '3.6em' : '2.4em', padding: '8px 0' }}>{card.art_emoji}</div>
                 <div style={{ fontSize: '0.7em', padding: 3, letterSpacing: 1, background: 'rgba(0,0,0,0.3)', color: '#ccc', textTransform: 'uppercase' }}>{card.type}</div>
               </div>
             );

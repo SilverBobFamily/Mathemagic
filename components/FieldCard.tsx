@@ -8,7 +8,7 @@ const MOD_COLORS = {
   event:  { bg: '#7f0000', color: '#ef9a9a' },
 };
 
-const SIZE_WIDTH: Record<'sm' | 'md' | 'lg', number> = { sm: 80, md: 100, lg: 130 };
+const SIZE_WIDTH: Record<'sm' | 'md' | 'lg', number> = { sm: 85, md: 110, lg: 160 };
 
 interface Props {
   fieldCard: FieldCardType;
@@ -45,7 +45,7 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: cardWidth - 28 }}>{card.name}</span>
         <span style={{ color: valueColor, fontWeight: isModified ? 900 : 700 }}>{displayValue}</span>
       </div>
-      <div style={{ fontSize: size === 'lg' ? '2.8em' : '2.2em', padding: '6px 0' }}>{card.art_emoji}</div>
+      <div style={{ fontSize: size === 'lg' ? '3.5em' : '2.4em', padding: '8px 0' }}>{card.art_emoji}</div>
       {modifiers.map((mod, i) => {
         const colors = MOD_COLORS[mod.card.type as keyof typeof MOD_COLORS] ?? MOD_COLORS.item;
         return (
