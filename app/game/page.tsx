@@ -14,6 +14,8 @@ export default function GamePage() {
   const [mode, setMode] = useState<Mode>('ai');
   const [loading, setLoading] = useState(true);
   const [learningMode, setLearningMode] = useState(false);
+  // Pending AI event: show the announcement before applying state
+  const [aiEventPending, setAiEventPending] = useState<{ card: Card; nextState: GameState } | null>(null);
 
   useEffect(() => {
     fetchAllCards().then(c => { setCards(c); setLoading(false); });
@@ -28,9 +30,9 @@ export default function GamePage() {
     setState(createGame(playerDeck, opponentDeck, learningMode));
   }, [cards, learningMode]);
 
-  // AI auto-play
+  // AI auto-play — paused while an event announcement is pending
   useEffect(() => {
-    if (!state || mode !== 'ai' || state.turn !== 'opponent' || isGameOver(state)) return;
+    if (!state || mode !== 'ai' || state.turn !== 'opponent' || isGameOver(state) || aiEventPending) return;
     const timer = setTimeout(() => {
       const move = chooseAiMove(state);
       if (!move) { setState(s => s && passTurn(s)); return; }
@@ -49,12 +51,22 @@ export default function GamePage() {
           move.targetCreatureId, move.targetSide,
           move.secondTargetId, move.secondTargetSide
         );
+        // Show event announcement; apply state only after dismiss
+        if (next) {
+          setAiEventPending({ card, nextState: endTurn(next) });
+          return;
+        }
       }
-      // If no valid play was found, pass the turn (counts as using one play slot)
       setState(next ? endTurn(next) : passTurn(state));
     }, 900);
     return () => clearTimeout(timer);
-  }, [state, mode]);
+  }, [state, mode, aiEventPending]);
+
+  const handleAiEventDismissed = useCallback(() => {
+    if (!aiEventPending) return;
+    setState(aiEventPending.nextState);
+    setAiEventPending(null);
+  }, [aiEventPending]);
 
   if (loading) {
     return (
@@ -114,7 +126,14 @@ export default function GamePage() {
           ← New Game
         </button>
       </div>
-      <GameBoard state={state} onStateChange={setState} mode={mode} onNewGame={() => setState(null)} />
+      <GameBoard
+        state={state}
+        onStateChange={setState}
+        mode={mode}
+        onNewGame={() => setState(null)}
+        aiEventAnnouncement={aiEventPending ? { card: aiEventPending.card, playedBy: 'opponent' } : null}
+        onAiEventDismissed={handleAiEventDismissed}
+      />
     </div>
   );
 }

@@ -1,11 +1,12 @@
 'use client';
 import { useState, useCallback, useRef } from 'react';
 import type { GameState, Card, FieldCard as FieldCardType, Side } from '@/lib/types';
-import { computeScore, playCreature, playModifier, playEvent, endTurn, passTurn, isGameOver, getWinner } from '@/lib/GameEngine';
+import { computeScore, computeCardValue, playCreature, playModifier, playEvent, endTurn, passTurn, isGameOver, getWinner } from '@/lib/GameEngine';
 import FieldCardComponent from './FieldCard';
 import CardModal from './CardModal';
 import LearningModePrompt from './LearningModePrompt';
 import GameOverScreen from './GameOverScreen';
+import EventAnnouncement from './EventAnnouncement';
 import { useWindowWidth } from '@/hooks/useWindowWidth';
 
 interface Props {
@@ -13,9 +14,19 @@ interface Props {
   onStateChange: (s: GameState) => void;
   mode: 'ai' | 'pass-and-play';
   onNewGame: () => void;
+  // For AI-played events: game page passes the announcement here
+  aiEventAnnouncement?: { card: Card; playedBy: 'opponent' } | null;
+  onAiEventDismissed?: () => void;
 }
 
-export default function GameBoard({ state, onStateChange, mode, onNewGame }: Props) {
+interface ModifierFlash {
+  creatureId: number;
+  card: Card;
+  oldValue: number;
+  newValue: number;
+}
+
+export default function GameBoard({ state, onStateChange, mode, onNewGame, aiEventAnnouncement, onAiEventDismissed }: Props) {
   const [modalData, setModalData] = useState<{ fieldCard?: FieldCardType; handCard?: Card } | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [firstEventTarget, setFirstEventTarget] = useState<{ creatureId: number; side: Side } | null>(null);
@@ -25,9 +36,11 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
     onConfirm: () => void;
   } | null>(null);
   const [draggedCard, setDraggedCard] = useState<Card | null>(null);
-  // Ref mirrors draggedCard so drop handlers always read the live value, not a stale closure
+  const [eventAnnouncement, setEventAnnouncement] = useState<{ card: Card; applyFn: () => void } | null>(null);
+  const [modifierFlash, setModifierFlash] = useState<ModifierFlash | null>(null);
+  const modFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const draggedCardRef = useRef<Card | null>(null);
-  // Prevents a spurious click event (fired after drop in some browsers) from double-playing
   const dropJustFired = useRef(false);
 
   const windowWidth = useWindowWidth();
@@ -40,13 +53,40 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
   const winner = gameOver ? getWinner(state) : null;
   const isMyTurn = state.turn === 'player';
 
-  const playAndEndTurn = useCallback((newState: GameState) => {
+  const clearSelection = useCallback(() => {
     setSelectedCard(null);
     setFirstEventTarget(null);
     setModalData(null);
     setLearningCheck(null);
+  }, []);
+
+  const playAndEndTurn = useCallback((newState: GameState) => {
+    clearSelection();
     onStateChange(endTurn(newState));
-  }, [onStateChange]);
+  }, [onStateChange, clearSelection]);
+
+  // Play a modifier with flash animation
+  const playModifierWithFlash = useCallback((
+    currentState: GameState,
+    cardId: number,
+    creatureId: number,
+    side: Side
+  ) => {
+    const targetFc = currentState[side].field.find(fc => fc.card.id === creatureId);
+    const modCard = currentState[currentState.turn].hand.find(c => c.id === cardId);
+    const oldValue = targetFc ? computeCardValue(targetFc) : 0;
+    const newState = playModifier(currentState, cardId, creatureId, side);
+    const newTargetFc = newState[side].field.find(fc => fc.card.id === creatureId);
+    const newValue = newTargetFc ? computeCardValue(newTargetFc) : 0;
+
+    if (modCard && targetFc) {
+      if (modFlashTimer.current) clearTimeout(modFlashTimer.current);
+      setModifierFlash({ creatureId, card: modCard, oldValue, newValue });
+      modFlashTimer.current = setTimeout(() => setModifierFlash(null), 1700);
+    }
+    clearSelection();
+    onStateChange(endTurn(newState));
+  }, [onStateChange, clearSelection]);
 
   const handleHandCardClick = useCallback((card: Card) => {
     if (gameOver) return;
@@ -71,7 +111,6 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
   }, []);
 
   const handleDropOnZone = useCallback((side: Side) => {
-    // Use ref for live value; fall back to selectedCard for click-then-place flow
     const card = draggedCardRef.current ?? selectedCard;
     if (!card || card.type !== 'creature') return;
     dropJustFired.current = true;
@@ -82,7 +121,6 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
   }, [selectedCard, state, playAndEndTurn]);
 
   const handleFieldZoneClick = useCallback((side: Side) => {
-    // Ignore if a drop just fired (some browsers send click after drop)
     if (dropJustFired.current) return;
     if (gameOver || !selectedCard || selectedCard.type !== 'creature') return;
     playAndEndTurn(playCreature(state, selectedCard.id, side));
@@ -93,7 +131,6 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
       setModalData({ fieldCard: fc });
       return;
     }
-    // Don't allow playing during opponent's turn — clear selection and show card info instead
     if (selectedCard && !isMyTurn) {
       setSelectedCard(null);
       setFirstEventTarget(null);
@@ -106,7 +143,7 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
     }
 
     if (selectedCard.type === 'item' || selectedCard.type === 'action') {
-      const doPlay = () => playAndEndTurn(playModifier(state, selectedCard.id, fc.card.id, side));
+      const doPlay = () => playModifierWithFlash(state, selectedCard.id, fc.card.id, side);
       if (state.learningMode) {
         setModalData(null);
         setLearningCheck({ fieldCard: fc, modifierCard: selectedCard, onConfirm: doPlay });
@@ -123,11 +160,11 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
           setFirstEventTarget({ creatureId: fc.card.id, side });
           return;
         }
-        const doPlay = () => playAndEndTurn(playEvent(
-          state, selectedCard.id,
-          firstEventTarget.creatureId, firstEventTarget.side,
-          fc.card.id, side
-        ));
+        const doPlay = () => {
+          const newState = playEvent(state, selectedCard.id, firstEventTarget.creatureId, firstEventTarget.side, fc.card.id, side);
+          setEventAnnouncement({ card: selectedCard, applyFn: () => playAndEndTurn(newState) });
+          clearSelection();
+        };
         if (state.learningMode && effect === 'mirror') {
           setLearningCheck({ fieldCard: fc, modifierCard: selectedCard, onConfirm: doPlay });
           return;
@@ -135,7 +172,11 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
         doPlay();
         return;
       }
-      const doPlay = () => playAndEndTurn(playEvent(state, selectedCard.id, fc.card.id, side));
+      const doPlay = () => {
+        const newState = playEvent(state, selectedCard.id, fc.card.id, side);
+        setEventAnnouncement({ card: selectedCard, applyFn: () => playAndEndTurn(newState) });
+        clearSelection();
+      };
       if (state.learningMode && (effect === 'x100' || effect === 'reverse')) {
         const syntheticMod: Card = { ...selectedCard, operator_value: effect === 'x100' ? 100 : -1, type: 'action' };
         setLearningCheck({ fieldCard: fc, modifierCard: syntheticMod, onConfirm: doPlay });
@@ -144,10 +185,9 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
       doPlay();
       return;
     }
-  }, [gameOver, isMyTurn, selectedCard, firstEventTarget, state, playAndEndTurn]);
+  }, [gameOver, isMyTurn, selectedCard, firstEventTarget, state, playAndEndTurn, playModifierWithFlash, clearSelection]);
 
   const handleDropOnFieldCard = useCallback((fc: FieldCardType, side: Side) => {
-    // Use ref for live value — avoids stale closure from the render before dragStart
     const card = draggedCardRef.current;
     if (!card) return;
     dropJustFired.current = true;
@@ -157,18 +197,16 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
     setSelectedCard(null);
 
     if (card.type === 'item' || card.type === 'action') {
-      const doPlay = () => playAndEndTurn(playModifier(state, card.id, fc.card.id, side));
+      const doPlay = () => playModifierWithFlash(state, card.id, fc.card.id, side);
       if (state.learningMode) {
         setLearningCheck({ fieldCard: fc, modifierCard: card, onConfirm: doPlay });
       } else {
         doPlay();
       }
     } else if (card.type === 'event') {
-      // Events may need two targets — select the card and let the player click targets
       setSelectedCard(card);
     }
-    // creatures dragged onto field cards are a no-op; they need to land on the zone
-  }, [state, playAndEndTurn]);
+  }, [state, playModifierWithFlash]);
 
   const isCreatureSelected = selectedCard?.type === 'creature';
   const isTargeting = !!selectedCard && selectedCard.type !== 'creature';
@@ -190,6 +228,19 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
     border: isCreatureSelected ? '2px dashed #ffd54f' : '2px solid transparent',
     cursor: isCreatureSelected ? 'pointer' : 'default',
   });
+
+  const showEventModal = eventAnnouncement || (aiEventAnnouncement ?? null);
+  const eventCard = eventAnnouncement?.card ?? aiEventAnnouncement?.card ?? null;
+  const eventPlayedBy = eventAnnouncement ? 'player' : 'opponent';
+  const dismissEvent = () => {
+    if (eventAnnouncement) {
+      const fn = eventAnnouncement.applyFn;
+      setEventAnnouncement(null);
+      fn();
+    } else {
+      onAiEventDismissed?.();
+    }
+  };
 
   return (
     <div style={{ background: '#0a0a1a', borderRadius: 12, overflow: 'hidden', border: '2px solid #333', fontFamily: "'Crimson Text', serif", fontSize: sizeTier === 'lg' ? '1.05em' : '0.95em', color: '#eee' }}>
@@ -217,6 +268,7 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
                 onClick={() => handleFieldCardClick(fc, 'opponent')}
                 highlighted={isTargeting || !!firstEventTarget}
                 size={sizeTier}
+                flashModifier={modifierFlash?.creatureId === fc.card.id ? modifierFlash : null}
               />
             </div>
           ))}
@@ -279,6 +331,7 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
                 onClick={() => handleFieldCardClick(fc, 'player')}
                 highlighted={isTargeting || !!firstEventTarget}
                 size={sizeTier}
+                flashModifier={modifierFlash?.creatureId === fc.card.id ? modifierFlash : null}
               />
             </div>
           ))}
@@ -375,6 +428,14 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
           playerScore={playerScore}
           opponentScore={opponentScore}
           onNewGame={onNewGame}
+        />
+      )}
+
+      {showEventModal && eventCard && (
+        <EventAnnouncement
+          card={eventCard}
+          playedBy={eventPlayedBy as 'player' | 'opponent'}
+          onDismiss={dismissEvent}
         />
       )}
     </div>
