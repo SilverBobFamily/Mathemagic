@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchAllCards } from '@/lib/supabase';
-import { createGame, endTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
+import { createGame, endTurn, passTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
 import { chooseAiMove } from '@/lib/ai';
 import GameBoard from '@/components/GameBoard';
 import type { Card, GameState } from '@/lib/types';
@@ -26,17 +26,17 @@ export default function GamePage() {
     const opponentDeck = shuffled.slice(20, 40);
     setMode(m);
     setState(createGame(playerDeck, opponentDeck, learningMode));
-  }, [cards]);
+  }, [cards, learningMode]);
 
   // AI auto-play
   useEffect(() => {
     if (!state || mode !== 'ai' || state.turn !== 'opponent' || isGameOver(state)) return;
     const timer = setTimeout(() => {
       const move = chooseAiMove(state);
-      if (!move) { setState(s => s && endTurn(s)); return; }
+      if (!move) { setState(s => s && passTurn(s)); return; }
       const card = state.opponent.hand.find(c => c.id === move.cardId);
-      if (!card) { setState(s => s && endTurn(s)); return; }
-      let next = state;
+      if (!card) { setState(s => s && passTurn(s)); return; }
+      let next: typeof state | null = null;
       if (card.type === 'creature') {
         next = playCreature(state, move.cardId, move.targetSide);
       } else if (card.type === 'item' || card.type === 'action') {
@@ -47,10 +47,11 @@ export default function GamePage() {
         next = playEvent(
           state, move.cardId,
           move.targetCreatureId, move.targetSide,
-          (move as any).secondTargetId, (move as any).secondTargetSide
+          move.secondTargetId, move.secondTargetSide
         );
       }
-      setState(endTurn(next));
+      // If no valid play was found, pass the turn (counts as using one play slot)
+      setState(next ? endTurn(next) : passTurn(state));
     }, 900);
     return () => clearTimeout(timer);
   }, [state, mode]);

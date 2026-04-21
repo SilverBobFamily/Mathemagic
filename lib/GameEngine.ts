@@ -112,6 +112,18 @@ export function endTurn(state: GameState): GameState {
   return { ...next, turn: nextTurn, round: state.round + 1 };
 }
 
+// Pass the current turn without playing a card. Counts as using one of the player's 16 turns
+// so the game can always progress even when no valid play exists.
+export function passTurn(state: GameState): GameState {
+  const side = state.turn;
+  const ps = state[side];
+  const withCount: GameState = {
+    ...state,
+    [side]: { ...ps, playedCount: ps.playedCount + 1 },
+  };
+  return endTurn(withCount);
+}
+
 export function isGameOver(state: GameState): boolean {
   return state.player.playedCount >= 16 && state.opponent.playedCount >= 16;
 }
@@ -228,29 +240,46 @@ export function playEvent(
     const srcFc = srcPs.field.find(fc => fc.card.id === targetCreatureId)!;
     const tgtFc = tgtPs.field.find(fc => fc.card.id === secondTargetId)!;
     if (srcFc && tgtFc) {
-      s = {
-        ...s,
-        [targetSide]: {
-          ...srcPs,
-          field: srcPs.field.map(fc => fc.card.id === targetCreatureId ? tgtFc : fc),
-        },
-        [secondTargetSide]: {
-          ...tgtPs,
-          field: tgtPs.field.map(fc => fc.card.id === secondTargetId ? srcFc : fc),
-        },
-      };
+      if (targetSide === secondTargetSide) {
+        // Both creatures on the same side — update in a single pass to avoid spread collision
+        s = {
+          ...s,
+          [targetSide]: {
+            ...srcPs,
+            field: srcPs.field.map(fc => {
+              if (fc.card.id === targetCreatureId) return tgtFc;
+              if (fc.card.id === secondTargetId) return srcFc;
+              return fc;
+            }),
+          },
+        };
+      } else {
+        s = {
+          ...s,
+          [targetSide]: {
+            ...srcPs,
+            field: srcPs.field.map(fc => fc.card.id === targetCreatureId ? tgtFc : fc),
+          },
+          [secondTargetSide]: {
+            ...tgtPs,
+            field: tgtPs.field.map(fc => fc.card.id === secondTargetId ? srcFc : fc),
+          },
+        };
+      }
     }
   } else if (effect === 'reverse') {
+    // Reverse the sign of the single targeted creature (×−1 modifier)
     const reverseModCard: Card = { ...card, operator_value: -1, type: 'action' };
     const tPs = s[targetSide];
     s = {
       ...s,
       [targetSide]: {
         ...tPs,
-        field: tPs.field.map(fc => ({
-          ...fc,
-          modifiers: [...fc.modifiers, { card: reverseModCard }],
-        })),
+        field: tPs.field.map(fc =>
+          fc.card.id === targetCreatureId
+            ? { ...fc, modifiers: [...fc.modifiers, { card: reverseModCard }] }
+            : fc
+        ),
       },
     };
   }

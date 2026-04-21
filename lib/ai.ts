@@ -77,8 +77,8 @@ export function chooseAiMove(state: GameState): AiMove | null {
     if (effect === 'x100' && bestOwn) {
       return { cardId: event.id, targetSide: 'opponent', targetCreatureId: bestOwn.card.id };
     }
-    if (effect === 'reverse') {
-      return { cardId: event.id, targetSide: 'player', targetCreatureId: oppField[0]?.card.id };
+    if (effect === 'reverse' && bestOpp) {
+      return { cardId: event.id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
     }
     if (effect === 'mirror' && bestOwn && bestOpp) {
       return {

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback, useRef } from 'react';
 import type { GameState, Card, FieldCard as FieldCardType, Side } from '@/lib/types';
-import { computeScore, playCreature, playModifier, playEvent, endTurn, isGameOver, getWinner } from '@/lib/GameEngine';
+import { computeScore, playCreature, playModifier, playEvent, endTurn, passTurn, isGameOver, getWinner } from '@/lib/GameEngine';
 import FieldCardComponent from './FieldCard';
 import CardModal from './CardModal';
 import LearningModePrompt from './LearningModePrompt';
@@ -23,6 +23,10 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
     onConfirm: () => void;
   } | null>(null);
   const [draggedCard, setDraggedCard] = useState<Card | null>(null);
+  // Ref mirrors draggedCard so drop handlers always read the live value, not a stale closure
+  const draggedCardRef = useRef<Card | null>(null);
+  // Prevents a spurious click event (fired after drop in some browsers) from double-playing
+  const dropJustFired = useRef(false);
   // Track whether a drag actually started — prevents dragstart from swallowing click events
   const dragStarted = useRef(false);
 
@@ -44,8 +48,9 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   }, [onStateChange]);
 
   const handleHandCardClick = useCallback((card: Card) => {
+    if (gameOver) return;
     setModalData({ handCard: card });
-  }, []);
+  }, [gameOver]);
 
   const handlePlayFromModal = useCallback((card: Card) => {
     setModalData(null);
@@ -55,29 +60,47 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
 
   const handleDragStart = useCallback((card: Card) => {
     dragStarted.current = true;
+    draggedCardRef.current = card;
     setDraggedCard(card);
     setSelectedCard(card);
   }, []);
 
   const handleDragEnd = useCallback(() => {
+    draggedCardRef.current = null;
     setDraggedCard(null);
-    // Reset after the click event window passes
     requestAnimationFrame(() => { dragStarted.current = false; });
   }, []);
 
   const handleDropOnZone = useCallback((side: Side) => {
-    const card = draggedCard ?? selectedCard;
+    // Use ref for live value; fall back to selectedCard for click-then-place flow
+    const card = draggedCardRef.current ?? selectedCard;
     if (!card || card.type !== 'creature') return;
-    playAndEndTurn(playCreature(state, card.id, side));
+    dropJustFired.current = true;
+    requestAnimationFrame(() => { dropJustFired.current = false; });
+    draggedCardRef.current = null;
     setDraggedCard(null);
-  }, [draggedCard, selectedCard, state, playAndEndTurn]);
-
-  const handleFieldZoneClick = useCallback((side: Side) => {
-    if (!selectedCard || selectedCard.type !== 'creature') return;
-    playAndEndTurn(playCreature(state, selectedCard.id, side));
+    playAndEndTurn(playCreature(state, card.id, side));
   }, [selectedCard, state, playAndEndTurn]);
 
+  const handleFieldZoneClick = useCallback((side: Side) => {
+    // Ignore if a drop just fired (some browsers send click after drop)
+    if (dropJustFired.current) return;
+    if (gameOver || !selectedCard || selectedCard.type !== 'creature') return;
+    playAndEndTurn(playCreature(state, selectedCard.id, side));
+  }, [gameOver, selectedCard, state, playAndEndTurn]);
+
   const handleFieldCardClick = useCallback((fc: FieldCardType, side: Side) => {
+    if (gameOver) {
+      setModalData({ fieldCard: fc });
+      return;
+    }
+    // Don't allow playing during opponent's turn — clear selection and show card info instead
+    if (selectedCard && !isMyTurn) {
+      setSelectedCard(null);
+      setFirstEventTarget(null);
+      setModalData({ fieldCard: fc });
+      return;
+    }
     if (!selectedCard) {
       setModalData({ fieldCard: fc });
       return;
@@ -122,15 +145,31 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
       doPlay();
       return;
     }
-  }, [selectedCard, firstEventTarget, state, playAndEndTurn]);
+  }, [gameOver, isMyTurn, selectedCard, firstEventTarget, state, playAndEndTurn]);
 
   const handleDropOnFieldCard = useCallback((fc: FieldCardType, side: Side) => {
-    const card = draggedCard;
+    // Use ref for live value — avoids stale closure from the render before dragStart
+    const card = draggedCardRef.current;
     if (!card) return;
+    dropJustFired.current = true;
+    requestAnimationFrame(() => { dropJustFired.current = false; });
+    draggedCardRef.current = null;
     setDraggedCard(null);
-    setSelectedCard(card);
-    handleFieldCardClick(fc, side);
-  }, [draggedCard, handleFieldCardClick]);
+    setSelectedCard(null);
+
+    if (card.type === 'item' || card.type === 'action') {
+      const doPlay = () => playAndEndTurn(playModifier(state, card.id, fc.card.id, side));
+      if (state.learningMode) {
+        setLearningCheck({ fieldCard: fc, modifierCard: card, onConfirm: doPlay });
+      } else {
+        doPlay();
+      }
+    } else if (card.type === 'event') {
+      // Events may need two targets — select the card and let the player click targets
+      setSelectedCard(card);
+    }
+    // creatures dragged onto field cards are a no-op; they need to land on the zone
+  }, [state, playAndEndTurn]);
 
   const isCreatureSelected = selectedCard?.type === 'creature';
   const isTargeting = !!selectedCard && selectedCard.type !== 'creature';
@@ -199,23 +238,24 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
           <span style={{ color: '#ffd54f', fontWeight: 600 }}>{instructionText}</span>
         ) : null}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
-          <button
-            onClick={() => onStateChange({ ...state, learningMode: !state.learningMode })}
-            style={{
-              background: state.learningMode ? '#1a3a1a' : '#1a1a2e',
-              color: state.learningMode ? '#a5d6a7' : '#555',
-              border: `1px solid ${state.learningMode ? '#2e7d32' : '#333'}`,
-              borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8em',
-            }}
-          >
-            🧮 {state.learningMode ? 'Learning ON' : 'Learning OFF'}
-          </button>
           {selectedCard && isMyTurn && (
             <button
               onClick={() => { setSelectedCard(null); setFirstEventTarget(null); }}
               style={{ background: '#2a1a1a', color: '#ef9a9a', border: '1px solid #7f0000', borderRadius: 6, padding: '3px 12px', cursor: 'pointer' }}
             >
               Cancel
+            </button>
+          )}
+          {isMyTurn && !gameOver && (
+            <button
+              onClick={() => {
+                setSelectedCard(null);
+                setFirstEventTarget(null);
+                onStateChange(passTurn(state));
+              }}
+              style={{ background: '#1a1a1a', color: '#888', border: '1px solid #444', borderRadius: 6, padding: '3px 12px', cursor: 'pointer', fontSize: '0.8em' }}
+            >
+              Pass →
             </button>
           )}
         </div>
@@ -255,8 +295,22 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
 
       {/* Hand */}
       <div style={{ background: '#0a0a14', padding: '14px 18px' }}>
-        <div style={{ color: '#555', fontSize: '0.75em', marginBottom: 10, letterSpacing: 1 }}>
-          {isMyTurn ? 'YOUR HAND — Click to view · Drag to play' : "OPPONENT'S TURN"}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ color: '#555', fontSize: '0.75em', letterSpacing: 1 }}>
+            {isMyTurn ? 'YOUR HAND — Click to view · Drag to play' : "OPPONENT'S TURN"}
+          </span>
+          <button
+            onClick={() => onStateChange({ ...state, learningMode: !state.learningMode })}
+            style={{
+              background: state.learningMode ? '#1a3a1a' : 'transparent',
+              color: state.learningMode ? '#a5d6a7' : '#555',
+              border: `1px solid ${state.learningMode ? '#2e7d32' : '#444'}`,
+              borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.75em',
+              fontFamily: 'sans-serif',
+            }}
+          >
+            🧮 Learning Mode {state.learningMode ? 'ON' : 'OFF'}
+          </button>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {state.player.hand.map(card => {

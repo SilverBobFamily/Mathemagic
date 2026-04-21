@@ -21,7 +21,10 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
   const { card, modifiers, zeroed } = fieldCard;
   const total = computeCardValue(fieldCard);
   const hasModifiers = modifiers.length > 0 || zeroed;
-  const valueColor = (card.value ?? 0) < 0 ? '#ef9a9a' : '#fff';
+  const isModified = hasModifiers;
+  // Show current computed value in the header; highlight it when it differs from base
+  const displayValue = isModified ? total : (card.value ?? 0);
+  const valueColor = displayValue < 0 ? '#ef9a9a' : isModified ? '#ffd54f' : '#fff';
   const cardWidth = SIZE_WIDTH[size];
 
   return (
@@ -40,7 +43,7 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
     >
       <div style={{ background: '#0d1642', padding: '3px 6px', fontSize: '0.8em', color: '#fff', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: cardWidth - 28 }}>{card.name}</span>
-        <span style={{ color: valueColor }}>{card.value}</span>
+        <span style={{ color: valueColor, fontWeight: isModified ? 900 : 700 }}>{displayValue}</span>
       </div>
       <div style={{ fontSize: size === 'lg' ? '2.8em' : '2.2em', padding: '6px 0' }}>{card.art_emoji}</div>
       {modifiers.map((mod, i) => {
@@ -53,9 +56,6 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
       })}
       {zeroed && (
         <div style={{ background: '#7f0000', color: '#ef9a9a', fontSize: '0.65em', padding: '2px 4px', fontWeight: 700 }}>ZEROED</div>
-      )}
-      {hasModifiers && (
-        <div style={{ color: '#ffd54f', fontSize: '0.8em', padding: '2px 3px', background: '#111', fontWeight: 700 }}>= {total}</div>
       )}
     </div>
   );
