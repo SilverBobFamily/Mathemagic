@@ -50,7 +50,7 @@ export default function Card({ card, releaseNumber, scale = 1 }: Props) {
     (card.operator ?? '').replace('÷', '/');
   const valueColor = card.type === 'creature' && (card.value ?? 0) < 0 ? '#ef5350' : '#90caf9';
   const w = Math.round(220 * scale);
-  const artH = Math.round(140 * scale);
+  const artH = w; // images are square — match width so nothing is cropped
   const nameMaxW = Math.round(140 * scale);
 
   return (
