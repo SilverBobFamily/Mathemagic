@@ -18,8 +18,7 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose,
   const card = fieldCard?.card ?? handCard!;
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
-  // Card component renders at fixed 220px; scale down on mobile
-  const cardScale = isMobile ? 180 / 220 : 1;
+  const cardScale = isMobile ? 0.9 : 2;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -41,14 +40,7 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose,
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          transformOrigin: 'top center',
-          transform: `scale(${cardScale})`,
-          // Compensate for the layout space the unscaled card occupies
-          marginBottom: isMobile ? `${Math.round((220 - 180) * -0.8)}px` : '0',
-        }}>
-          <CardComponent card={card} releaseNumber={releaseNumber} />
-        </div>
+        <CardComponent card={card} releaseNumber={releaseNumber} scale={cardScale} />
         {onPlay && (
           <button
             onClick={onPlay}

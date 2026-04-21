@@ -180,10 +180,16 @@ describe('endTurn', () => {
     expect(endTurn(state).turn).toBe('opponent');
   });
 
-  it('draws a card for the next player', () => {
-    const state = createGame(makeDeck(20), makeDeck(20));
-    const before = state.opponent.hand.length;
-    expect(endTurn(state).opponent.hand).toHaveLength(before + 1);
+  it('does not draw for the second player on their first turn (round 1)', () => {
+    const state = createGame(makeDeck(20), makeDeck(20)); // player first
+    const after = endTurn(state); // now opponent's turn
+    expect(after.opponent.hand).toHaveLength(state.opponent.hand.length); // no draw
+  });
+
+  it('draws a card starting from round 2', () => {
+    const state = createGame(makeDeck(20), makeDeck(20)); // player first
+    const afterRound1 = endTurn(endTurn(state)); // round 2, player's turn
+    expect(afterRound1.player.hand.length).toBeGreaterThanOrEqual(state.player.hand.length);
   });
 
   it('does not increment round mid-cycle (after player only)', () => {

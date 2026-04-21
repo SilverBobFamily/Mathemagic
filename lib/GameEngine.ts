@@ -111,9 +111,10 @@ export function playCreature(state: GameState, cardId: number, targetSide: Side)
 
 export function endTurn(state: GameState): GameState {
   const nextTurn: Side = state.turn === 'player' ? 'opponent' : 'player';
-  const next = drawCard(state, nextTurn);
-  // Increment round only when both players have completed a turn
   const newRound = nextTurn === state.firstTurn ? state.round + 1 : state.round;
+  // Neither player draws on the first turn — the second player starts with their initial 3 cards only
+  const shouldDraw = !(state.round === 1 && nextTurn !== state.firstTurn);
+  const next = shouldDraw ? drawCard(state, nextTurn) : state;
   return { ...next, turn: nextTurn, round: newRound };
 }
 

@@ -338,7 +338,11 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame }: Pro
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: handCardWidth - 30 }}>{card.name}</span>
                   <span>{card.value ?? (card.operator ?? '').replace('÷', '/') ?? 'EVT'}</span>
                 </div>
-                <div style={{ fontSize: sizeTier === 'lg' ? '3.6em' : '2.4em', padding: '8px 0' }}>{card.art_emoji}</div>
+                <div style={{ height: sizeTier === 'lg' ? 80 : 56, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {card.art_url
+                    ? <img src={card.art_url} alt={card.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <span style={{ fontSize: sizeTier === 'lg' ? '3.6em' : '2.4em' }}>{card.art_emoji}</span>}
+                </div>
                 <div style={{ fontSize: '0.7em', padding: 3, letterSpacing: 1, background: 'rgba(0,0,0,0.3)', color: '#ccc', textTransform: 'uppercase' }}>{card.type}</div>
               </div>
             );

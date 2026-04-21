@@ -45,7 +45,11 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: cardWidth - 28 }}>{card.name}</span>
         <span style={{ color: valueColor, fontWeight: isModified ? 900 : 700 }}>{displayValue}</span>
       </div>
-      <div style={{ fontSize: size === 'lg' ? '3.5em' : '2.4em', padding: '8px 0' }}>{card.art_emoji}</div>
+      <div style={{ height: size === 'lg' ? 80 : 56, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {card.art_url
+          ? <img src={card.art_url} alt={card.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          : <span style={{ fontSize: size === 'lg' ? '3.5em' : '2.4em' }}>{card.art_emoji}</span>}
+      </div>
       {modifiers.map((mod, i) => {
         const colors = MOD_COLORS[mod.card.type as keyof typeof MOD_COLORS] ?? MOD_COLORS.item;
         return (
