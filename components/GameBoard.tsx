@@ -27,8 +27,6 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   const draggedCardRef = useRef<Card | null>(null);
   // Prevents a spurious click event (fired after drop in some browsers) from double-playing
   const dropJustFired = useRef(false);
-  // Track whether a drag actually started — prevents dragstart from swallowing click events
-  const dragStarted = useRef(false);
 
   const windowWidth = useWindowWidth();
   const sizeTier: 'sm' | 'md' | 'lg' = windowWidth >= 1100 ? 'lg' : windowWidth >= 700 ? 'md' : 'sm';
@@ -60,14 +58,12 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
   }, []);
 
   const handleDragStart = useCallback((card: Card) => {
-    dragStarted.current = true;
     draggedCardRef.current = card;
     setDraggedCard(card);
     setSelectedCard(card);
   }, []);
 
   const handleDragEnd = useCallback(() => {
-    dragStarted.current = false;
     draggedCardRef.current = null;
     setDraggedCard(null);
   }, []);
@@ -325,10 +321,7 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
                 draggable={isMyTurn}
                 onDragStart={() => handleDragStart(card)}
                 onDragEnd={handleDragEnd}
-                onClick={() => {
-                  // Only treat as a click if no drag actually started
-                  if (!dragStarted.current) handleHandCardClick(card);
-                }}
+                onClick={() => handleHandCardClick(card)}
                 style={{
                   width: handCardWidth, borderRadius: 8, overflow: 'hidden',
                   border: `3px solid ${isSelected ? '#fff' : '#ffd54f'}`,
