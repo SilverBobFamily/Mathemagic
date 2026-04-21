@@ -48,10 +48,11 @@ export interface PlayerState {
 export interface GameState {
   phase: GamePhase;
   turn: Side;
-  round: number;       // 1–16, plus bonus rounds in sudden death
+  firstTurn: Side;     // who went first — round increments when we return to them
+  round: number;       // increments after both players have taken a turn
   player: PlayerState;
   opponent: PlayerState;
   winner: Side | 'tie' | null;
-  pendingCard: Card | null;       // card selected from hand, waiting for target
+  pendingCard: Card | null;
   learningMode: boolean;
 }

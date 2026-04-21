@@ -47,9 +47,11 @@ function makePlayerState(deck: Card[]): PlayerState {
 }
 
 export function createGame(playerDeck: Card[], opponentDeck: Card[], learningMode = false): GameState {
-  return {
+  const firstTurn: Side = Math.random() < 0.5 ? 'player' : 'opponent';
+  const base: GameState = {
     phase: 'playing',
-    turn: 'player',
+    turn: firstTurn,
+    firstTurn,
     round: 1,
     player: makePlayerState(playerDeck),
     opponent: makePlayerState(opponentDeck),
@@ -57,6 +59,7 @@ export function createGame(playerDeck: Card[], opponentDeck: Card[], learningMod
     pendingCard: null,
     learningMode,
   };
+  return base;
 }
 
 export function computeExpectedValue(fc: FieldCard, newModifierCard: Card): number {
@@ -109,7 +112,9 @@ export function playCreature(state: GameState, cardId: number, targetSide: Side)
 export function endTurn(state: GameState): GameState {
   const nextTurn: Side = state.turn === 'player' ? 'opponent' : 'player';
   const next = drawCard(state, nextTurn);
-  return { ...next, turn: nextTurn, round: state.round + 1 };
+  // Increment round only when both players have completed a turn
+  const newRound = nextTurn === state.firstTurn ? state.round + 1 : state.round;
+  return { ...next, turn: nextTurn, round: newRound };
 }
 
 // Pass the current turn without playing a card. Counts as using one of the player's 16 turns

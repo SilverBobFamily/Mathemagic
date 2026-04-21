@@ -117,6 +117,10 @@ const makeDeck = (size: number): Card[] =>
   }));
 
 describe('createGame', () => {
+  // Pin Math.random so starting player is deterministic (< 0.5 → player first)
+  beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1));
+  afterEach(() => jest.restoreAllMocks());
+
   it('deals 3 cards to each hand', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
     expect(state.player.hand).toHaveLength(3);
@@ -129,15 +133,25 @@ describe('createGame', () => {
     expect(state.player.deck).toHaveLength(13);
   });
 
-  it('starts on player turn, round 1, phase playing', () => {
+  it('starts on round 1, phase playing, with a random first turn', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
-    expect(state.turn).toBe('player');
+    expect(state.turn).toBe('player'); // 0.1 < 0.5 → player first
     expect(state.round).toBe(1);
     expect(state.phase).toBe('playing');
+  });
+
+  it('starts opponent first when random >= 0.5', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.7);
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(state.turn).toBe('opponent');
+    expect(state.firstTurn).toBe('opponent');
   });
 });
 
 describe('playCreature', () => {
+  beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1)); // player first
+  afterEach(() => jest.restoreAllMocks());
+
   it('moves card from player hand to player field', () => {
     let state = createGame(makeDeck(20), makeDeck(20));
     const cardId = state.player.hand[0].id;
@@ -158,6 +172,9 @@ describe('playCreature', () => {
 });
 
 describe('endTurn', () => {
+  beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1)); // player first
+  afterEach(() => jest.restoreAllMocks());
+
   it('switches turn from player to opponent', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
     expect(endTurn(state).turn).toBe('opponent');
@@ -166,13 +183,18 @@ describe('endTurn', () => {
   it('draws a card for the next player', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
     const before = state.opponent.hand.length;
-    const next = endTurn(state);
-    expect(next.opponent.hand).toHaveLength(before + 1);
+    expect(endTurn(state).opponent.hand).toHaveLength(before + 1);
   });
 
-  it('increments round', () => {
-    const state = createGame(makeDeck(20), makeDeck(20));
-    expect(endTurn(state).round).toBe(2);
+  it('does not increment round mid-cycle (after player only)', () => {
+    const state = createGame(makeDeck(20), makeDeck(20)); // player first
+    expect(endTurn(state).round).toBe(1); // opponent hasn't gone yet
+  });
+
+  it('increments round after both players have taken a turn', () => {
+    const state = createGame(makeDeck(20), makeDeck(20)); // player first
+    const afterBoth = endTurn(endTurn(state));            // player → opponent → player
+    expect(afterBoth.round).toBe(2);
   });
 });
 
@@ -194,6 +216,9 @@ describe('isGameOver', () => {
 
 
 describe('playModifier', () => {
+  beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1));
+  afterEach(() => jest.restoreAllMocks());
+
   it('attaches item to target creature on player field', () => {
     let state = createGame(makeDeck(20), makeDeck(20));
     // Play a creature to player field
@@ -221,6 +246,9 @@ describe('playModifier', () => {
 });
 
 describe('playEvent', () => {
+  beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1));
+  afterEach(() => jest.restoreAllMocks());
+
   it('zero_out sets zeroed flag', () => {
     let state = createGame(makeDeck(20), makeDeck(20));
     const creatureId = state.player.hand[0].id;
