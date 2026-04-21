@@ -38,36 +38,39 @@ export function chooseAiMove(state: GameState): AiMove | null {
     ? [...oppField].sort((a, b) => computeCardValue(b) - computeCardValue(a))[0]
     : null;
 
-  // 2. Actions on own best creature
-  if (actions.length > 0 && bestOwn) {
-    return {
-      cardId: actions[0].id,
-      targetSide: 'opponent',
-      targetCreatureId: bestOwn.card.id,
-    };
+  const ownBestValue  = bestOwn ? computeCardValue(bestOwn)  : 0;
+  const oppBestValue  = bestOpp ? computeCardValue(bestOpp)  : 0;
+
+  // Separate modifiers by whether they help or hurt a target
+  const boostActions = actions.filter(a => (a.operator_value ?? 0) > 1);   // ×2 ×5 ×10
+  const hurtActions  = actions.filter(a => (a.operator_value ?? 0) < 1);   // ÷2 ÷5 ×(−1)
+  const posItems     = items.filter(i  => (i.operator_value  ?? 0) > 0);
+  const negItems     = items.filter(i  => (i.operator_value  ?? 0) < 0);
+
+  // 2. Boost actions on own best POSITIVE creature
+  if (boostActions.length > 0 && bestOwn && ownBestValue > 0) {
+    const best = [...boostActions].sort(
+      (a, b) => (b.operator_value ?? 0) - (a.operator_value ?? 0)
+    )[0];
+    return { cardId: best.id, targetSide: 'opponent', targetCreatureId: bestOwn.card.id };
   }
 
   // 3. Positive items on own best creature
-  const posItems = items.filter(i => (i.operator_value ?? 0) > 0);
   if (posItems.length > 0 && bestOwn) {
-    return {
-      cardId: posItems[0].id,
-      targetSide: 'opponent',
-      targetCreatureId: bestOwn.card.id,
-    };
+    return { cardId: posItems[0].id, targetSide: 'opponent', targetCreatureId: bestOwn.card.id };
   }
 
-  // 4. Negative items on opponent's best creature
-  const negItems = items.filter(i => (i.operator_value ?? 0) < 0);
+  // 4. Hurt actions (divide / flip-negative) on opponent's best POSITIVE creature
+  if (hurtActions.length > 0 && bestOpp && oppBestValue > 0) {
+    return { cardId: hurtActions[0].id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
+  }
+
+  // 5. Negative items on opponent's best creature
   if (negItems.length > 0 && bestOpp) {
-    return {
-      cardId: negItems[0].id,
-      targetSide: 'player',
-      targetCreatureId: bestOpp.card.id,
-    };
+    return { cardId: negItems[0].id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
   }
 
-  // 5. Events
+  // 6. Events
   if (events.length > 0) {
     const event = events[0];
     const effect = event.effect_type;
@@ -103,6 +106,6 @@ export function chooseAiMove(state: GameState): AiMove | null {
     }
   }
 
-  // 6. Fallback
+  // 7. Fallback
   return { cardId: hand[0].id, targetSide: 'opponent' };
 }

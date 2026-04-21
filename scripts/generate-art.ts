@@ -210,7 +210,7 @@ const PROMPTS: Record<number, Record<string, string>> = {
 
     'Carnivore Diet': `${R3}. Subject: a Victorian scientific illustration of a large carnivorous dinosaur skull and jaw with teeth labeled, surrounded by bone specimens and botanical context drawings, precise linework, earth tones, white vignette border. ${bunny('barely visible among the smaller specimen labels and fossil fragments arranged around the skull', 'pale ivory-cream of the specimen labels and fossil bone fragments')} ${CLOSE}`,
 
-    'Stampede': `${R3}. Subject: a herd of dinosaurs stampeding across an open prehistoric plain, depicted in Victorian natural history panorama style showing multiple species in motion, dramatic earth tones, dust rising, white vignette border. ${panda('barely visible in the dust cloud at the far right edge of the stampede', 'warm tan-gray of the billowing prehistoric dust')} ${CLOSE}`,
+    'Herd Stampede': `${R3}. Subject: a herd of dinosaurs stampeding across an open prehistoric plain, depicted in Victorian natural history panorama style showing multiple species in motion, dramatic earth tones, dust rising, white vignette border. ${panda('barely visible in the dust cloud at the far right edge of the stampede', 'warm tan-gray of the billowing prehistoric dust')} ${CLOSE}`,
 
     'Predator Leap': `${R3}. Subject: a large predatory dinosaur caught mid-leap in a precise Audubon-style scientific illustration, anatomical details accurate and labeled, prehistoric forest behind it, earth tones and jungle greens, white vignette border. ${bunny('barely visible in the dense undergrowth in the deep background', 'dark jungle green and shadow of the prehistoric forest floor')} ${CLOSE}`,
 
