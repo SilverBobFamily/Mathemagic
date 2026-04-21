@@ -44,6 +44,7 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
     setSelectedCard(null);
     setFirstEventTarget(null);
     setModalData(null);
+    setLearningCheck(null);
     onStateChange(endTurn(newState));
   }, [onStateChange]);
 
@@ -369,6 +370,7 @@ export default function GameBoard({ state, onStateChange, mode }: Props) {
           fieldCard={learningCheck.fieldCard}
           modifierCard={learningCheck.modifierCard}
           onCorrect={learningCheck.onConfirm}
+          onDismiss={() => setLearningCheck(null)}
         />
       )}
     </div>

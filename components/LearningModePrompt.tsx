@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { FieldCard as FieldCardType, Card } from '@/lib/types';
 import { computeCardValue, computeExpectedValue } from '@/lib/GameEngine';
 
@@ -7,12 +8,24 @@ interface Props {
   fieldCard: FieldCardType;       // the creature being modified
   modifierCard: Card;             // the card being played on it
   onCorrect: () => void;          // called when player gets it right
+  onDismiss: () => void;          // called when player cancels
 }
 
-export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect }: Props) {
+export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect, onDismiss }: Props) {
   const [input, setInput] = useState('');
   const [wrong, setWrong] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const expected = computeExpectedValue(fieldCard, modifierCard);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onDismiss]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,10 +35,11 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect 
     } else {
       setWrong(true);
       setInput('');
+      inputRef.current?.focus();
     }
   }
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
       zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -79,10 +93,10 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect 
 
         <form onSubmit={handleSubmit}>
           <input
+            ref={inputRef}
             type="number"
             value={input}
             onChange={e => setInput(e.target.value)}
-            autoFocus
             placeholder="Enter your answer..."
             style={{
               width: '100%', padding: '10px 14px', fontSize: '1.1em',
@@ -102,7 +116,14 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect 
             Check Answer →
           </button>
         </form>
+        <button
+          onClick={onDismiss}
+          style={{ marginTop: 10, width: '100%', padding: '7px', fontSize: '0.85em', background: 'transparent', color: '#555', border: '1px solid #333', borderRadius: 8, cursor: 'pointer' }}
+        >
+          Cancel
+        </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
