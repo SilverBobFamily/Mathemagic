@@ -1,5 +1,5 @@
 export type CardType = 'creature' | 'item' | 'action' | 'event';
-export type EventEffect = 'zero_out' | 'banish' | 'mirror' | 'x100' | 'swap' | 'reverse' | 'square';
+export type EventEffect = 'zero_out' | 'banish' | 'mirror' | 'x100' | 'swap' | 'reverse' | 'square' | 'reset' | 'multi_zero' | 'reverse_all';
 export type Side = 'player' | 'opponent';
 export type GamePhase = 'setup' | 'playing' | 'sudden_death' | 'finished';
 

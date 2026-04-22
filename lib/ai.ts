@@ -83,6 +83,15 @@ export function chooseAiMove(state: GameState): AiMove | null {
     if (effect === 'reverse' && bestOpp) {
       return { cardId: event.id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
     }
+    if (effect === 'reset' && bestOpp) {
+      return { cardId: event.id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
+    }
+    if (effect === 'multi_zero' && oppField.length > 0) {
+      return { cardId: event.id, targetSide: 'player', targetCreatureId: oppField[0].card.id };
+    }
+    if (effect === 'reverse_all' && oppField.length > 0) {
+      return { cardId: event.id, targetSide: 'player', targetCreatureId: oppField[0].card.id };
+    }
     if (effect === 'mirror' && bestOwn && bestOpp) {
       return {
         cardId: event.id,

@@ -300,6 +300,41 @@ export function playEvent(
         ),
       },
     };
+  } else if (effect === 'reset') {
+    // Restore targeted creature to its base value (clear all modifiers, zeroed, squared)
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc =>
+          fc.card.id === targetCreatureId
+            ? { ...fc, modifiers: [], zeroed: false, squared: false }
+            : fc
+        ),
+      },
+    };
+  } else if (effect === 'multi_zero') {
+    // Zero out ALL creatures on the target side
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc => ({ ...fc, zeroed: true })),
+      },
+    };
+  } else if (effect === 'reverse_all') {
+    // Flip signs of ALL creatures on the target side
+    const revMod: Card = { ...card, operator_value: -1, type: 'action' };
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc => ({ ...fc, modifiers: [...fc.modifiers, { card: revMod }] })),
+      },
+    };
   }
 
   return s;

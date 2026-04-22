@@ -17,7 +17,10 @@ const EFFECT_LABELS: Record<string, string> = {
   mirror:   'Mirror — copies one creature\'s value onto another',
   swap:     'Swap — exchanges two creatures between fields',
   reverse:  'Reverse — flips every creature\'s sign on a field',
-  square:   'x² — squares a creature\'s current value',
+  square:       'x² — squares a creature\'s current value',
+  reset:        'Reset — restores a creature to its original base value',
+  multi_zero:   'Family Brawl — zeroes out every creature on one side',
+  reverse_all:  'Reverse All — flips the signs of every creature on one side',
 };
 
 export default function EventAnnouncement({ card, playedBy, onDismiss }: Props) {
