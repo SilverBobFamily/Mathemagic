@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { fetchReleases, fetchCardsByRelease } from '@/lib/supabase';
 import type { Release, Card } from '@/lib/types';
 import CardComponent from '@/components/Card';
+import CardBrowserModal from '@/components/CardBrowserModal';
 
 export default function CardsPage() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [selected, setSelected] = useState<Release | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchReleases().then(r => { setReleases(r); setSelected(r[0] ?? null); });
@@ -19,6 +21,10 @@ export default function CardsPage() {
 
   return (
     <div style={{ padding: '24px 28px' }}>
+      <style>{`
+        .card-browser-item { cursor: pointer; transition: transform 0.15s ease; }
+        .card-browser-item:hover { transform: scale(1.02); }
+      `}</style>
       <h1 style={{ color: '#fff', marginTop: 0, marginBottom: 20 }}>Card Browser</h1>
       <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
         {releases.map(r => (
@@ -37,14 +43,27 @@ export default function CardsPage() {
         ))}
       </div>
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {cards.map(card => (
-          <CardComponent
+        {cards.map((card, index) => (
+          <div
             key={card.id}
-            card={{ ...card, release: selected ?? undefined }}
-            releaseNumber={selected?.number}
-          />
+            className="card-browser-item"
+            onClick={() => setSelectedIndex(index)}
+          >
+            <CardComponent
+              card={{ ...card, release: selected ?? undefined }}
+              releaseNumber={selected?.number}
+            />
+          </div>
         ))}
       </div>
+      {selectedIndex !== null && (
+        <CardBrowserModal
+          cards={cards}
+          initialIndex={selectedIndex}
+          release={selected}
+          onClose={() => setSelectedIndex(null)}
+        />
+      )}
     </div>
   );
 }
