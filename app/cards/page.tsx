@@ -30,7 +30,7 @@ export default function CardsPage() {
         {releases.map(r => (
           <button
             key={r.id}
-            onClick={() => setSelected(r)}
+            onClick={() => { setSelected(r); setSelectedIndex(null); }}
             style={{
               background: selected?.id === r.id ? r.color_hex : '#111',
               color: '#fff', border: `2px solid ${r.color_hex}`,

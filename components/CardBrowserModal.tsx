@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Card, Release } from '@/lib/types';
 import CardComponent from './Card';
 import { useWindowWidth } from '@/hooks/useWindowWidth';
@@ -27,15 +27,18 @@ export default function CardBrowserModal({ cards, initialIndex, release, onClose
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < cards.length - 1;
 
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'ArrowLeft') setCurrentIndex(i => Math.max(0, i - 1));
       if (e.key === 'ArrowRight') setCurrentIndex(i => Math.min(cards.length - 1, i + 1));
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [cards.length, onClose]);
+  }, [cards.length]);
 
   return (
     <div
