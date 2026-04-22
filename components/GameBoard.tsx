@@ -177,8 +177,14 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame, aiEve
         setEventAnnouncement({ card: selectedCard, applyFn: () => playAndEndTurn(newState) });
         clearSelection();
       };
-      if (state.learningMode && (effect === 'x100' || effect === 'reverse')) {
-        const syntheticMod: Card = { ...selectedCard, operator_value: effect === 'x100' ? 100 : -1, type: 'action' };
+      if (state.learningMode && (effect === 'x100' || effect === 'reverse' || effect === 'square')) {
+        const currentVal = state[side].field.find(f => f.card.id === fc.card.id);
+        const baseForLearning = currentVal ? computeCardValue(currentVal) : 0;
+        const syntheticMod: Card = {
+          ...selectedCard,
+          operator_value: effect === 'x100' ? 100 : effect === 'square' ? baseForLearning : -1,
+          type: 'action',
+        };
         setLearningCheck({ fieldCard: fc, modifierCard: syntheticMod, onConfirm: doPlay });
         return;
       }

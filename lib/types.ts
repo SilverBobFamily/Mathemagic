@@ -1,5 +1,5 @@
 export type CardType = 'creature' | 'item' | 'action' | 'event';
-export type EventEffect = 'zero_out' | 'banish' | 'mirror' | 'x100' | 'swap' | 'reverse';
+export type EventEffect = 'zero_out' | 'banish' | 'mirror' | 'x100' | 'swap' | 'reverse' | 'square';
 export type Side = 'player' | 'opponent';
 export type GamePhase = 'setup' | 'playing' | 'sudden_death' | 'finished';
 
@@ -35,6 +35,7 @@ export interface FieldCard {
   card: Card;          // the creature card
   modifiers: Modifier[];
   zeroed: boolean;     // true if zero_out event was applied
+  squared?: boolean;   // true if square event was applied (value² as final step)
 }
 
 export interface PlayerState {

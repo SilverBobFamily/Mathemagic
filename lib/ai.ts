@@ -77,7 +77,7 @@ export function chooseAiMove(state: GameState): AiMove | null {
     if ((effect === 'zero_out' || effect === 'banish') && bestOpp) {
       return { cardId: event.id, targetSide: 'player', targetCreatureId: bestOpp.card.id };
     }
-    if (effect === 'x100' && bestOwn) {
+    if ((effect === 'x100' || effect === 'square') && bestOwn && ownBestValue > 1) {
       return { cardId: event.id, targetSide: 'opponent', targetCreatureId: bestOwn.card.id };
     }
     if (effect === 'reverse' && bestOpp) {

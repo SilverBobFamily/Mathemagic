@@ -12,6 +12,7 @@ export function computeCardValue(fc: FieldCard): number {
       value *= mod.card.operator_value;
     }
   }
+  if (fc.squared) value = value * value;
   return value;
 }
 
@@ -273,6 +274,17 @@ export function playEvent(
         };
       }
     }
+  } else if (effect === 'square') {
+    const tPs = s[targetSide];
+    s = {
+      ...s,
+      [targetSide]: {
+        ...tPs,
+        field: tPs.field.map(fc =>
+          fc.card.id === targetCreatureId ? { ...fc, squared: true } : fc
+        ),
+      },
+    };
   } else if (effect === 'reverse') {
     // Reverse the sign of the single targeted creature (×−1 modifier)
     const reverseModCard: Card = { ...card, operator_value: -1, type: 'action' };

@@ -20,9 +20,9 @@ interface Props {
 }
 
 export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md', flashModifier }: Props) {
-  const { card, modifiers, zeroed } = fieldCard;
+  const { card, modifiers, zeroed, squared } = fieldCard;
   const total = computeCardValue(fieldCard);
-  const hasModifiers = modifiers.length > 0 || zeroed;
+  const hasModifiers = modifiers.length > 0 || zeroed || squared;
   const isModified = hasModifiers;
   const cardWidth = SIZE_WIDTH[size];
 
@@ -141,6 +141,9 @@ export default function FieldCard({ fieldCard, onClick, highlighted, size = 'md'
       })}
       {zeroed && (
         <div style={{ background: '#7f0000', color: '#ef9a9a', fontSize: '0.65em', padding: '2px 4px', fontWeight: 700 }}>ZEROED</div>
+      )}
+      {squared && (
+        <div style={{ background: '#c8960c', color: '#fff8e1', fontSize: '0.65em', padding: '2px 4px', fontWeight: 700 }}>SQUARED x²</div>
       )}
     </div>
   );

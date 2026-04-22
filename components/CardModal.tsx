@@ -85,6 +85,12 @@ export default function CardModal({ fieldCard, handCard, releaseNumber, onClose,
               <span style={{ color: '#ef9a9a', fontFamily: 'monospace' }}>→ 0</span>
             </div>
           )}
+          {fieldCard.squared && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e1e3a', fontSize: '0.9em' }}>
+              <span style={{ color: '#ffd54f' }}>Squared (x²)</span>
+              <span style={{ color: '#ffd54f', fontFamily: 'monospace' }}>→ {computeCardValue(fieldCard)}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 0', fontWeight: 700, fontSize: '1.1em', color: '#ffd54f', borderTop: '2px solid #2a2a5a', marginTop: 4 }}>
             <span>Current total</span>
             <span style={{ fontFamily: 'monospace' }}>{computeCardValue(fieldCard)}</span>
