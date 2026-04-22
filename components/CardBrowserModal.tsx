@@ -70,7 +70,7 @@ export default function CardBrowserModal({ cards, initialIndex, release, onClose
             scale={scale}
           />
         </div>
-        <div style={{ color: '#555', fontSize: '0.85em', letterSpacing: 1 }}>
+        <div style={{ color: '#999', fontSize: '0.85em', letterSpacing: 1 }}>
           {currentIndex + 1} of {cards.length}
         </div>
       </div>
