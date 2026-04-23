@@ -17,6 +17,7 @@ export default function GamePage() {
   const [mode, setMode] = useState<Mode>('ai');
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [learningMode, setLearningMode] = useState(false);
   const [aiEventPending, setAiEventPending] = useState<{ card: Card; nextState: GameState } | null>(null);
 
@@ -40,11 +41,14 @@ export default function GamePage() {
   const startGame = useCallback(async (m: Mode) => {
     if (activeReleaseIds.length < 2 || starting) return;
     setStarting(true);
+    setStartError(null);
     try {
       const pool = await fetchCardsByReleaseIds(activeReleaseIds);
       const { playerDeck, opponentDeck } = buildBalancedDecks(pool);
       setMode(m);
       setState(createGame(playerDeck, opponentDeck, learningMode));
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Failed to start game.');
     } finally {
       setStarting(false);
     }
@@ -147,6 +151,11 @@ export default function GamePage() {
           {tooFew && (
             <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
               Select at least 2 releases to play.
+            </p>
+          )}
+          {startError && (
+            <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
+              {startError}
             </p>
           )}
         </div>
