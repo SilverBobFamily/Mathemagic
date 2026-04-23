@@ -26,6 +26,18 @@ export async function fetchCardsByRelease(releaseId: number): Promise<Card[]> {
   return data;
 }
 
+export async function fetchCardsByReleaseIds(ids: number[]): Promise<Card[]> {
+  const { data, error } = await supabase
+    .from('cards')
+    .select('*, release:releases(*)')
+    .in('release_id', ids)
+    .order('release_id')
+    .order('type')
+    .order('name');
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchAllCards(): Promise<Card[]> {
   const { data, error } = await supabase
     .from('cards')
