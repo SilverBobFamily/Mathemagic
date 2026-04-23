@@ -186,7 +186,7 @@ export default function GamePage() {
               cursor: tooFew || starting ? 'not-allowed' : 'pointer',
             }}
           >
-            👥 Pass & Play
+            {starting ? '...' : '👥 Pass & Play'}
           </button>
         </div>
 
