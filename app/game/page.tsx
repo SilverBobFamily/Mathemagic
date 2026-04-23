@@ -1,34 +1,54 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { fetchAllCards } from '@/lib/supabase';
+import { fetchReleases, fetchCardsByReleaseIds } from '@/lib/supabase';
+import { getActiveReleaseIds, setActiveReleaseIds } from '@/lib/releases';
+import { buildBalancedDecks } from '@/lib/deck';
 import { createGame, endTurn, passTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
 import { chooseAiMove } from '@/lib/ai';
 import GameBoard from '@/components/GameBoard';
-import type { Card, GameState } from '@/lib/types';
+import type { Release, Card, GameState } from '@/lib/types';
 
 type Mode = 'ai' | 'pass-and-play';
 
 export default function GamePage() {
-  const [cards, setCards] = useState<Card[]>([]);
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [activeReleaseIds, setActiveIds] = useState<number[]>([]);
   const [state, setState] = useState<GameState | null>(null);
   const [mode, setMode] = useState<Mode>('ai');
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [learningMode, setLearningMode] = useState(false);
-  // Pending AI event: show the announcement before applying state
   const [aiEventPending, setAiEventPending] = useState<{ card: Card; nextState: GameState } | null>(null);
 
   useEffect(() => {
-    fetchAllCards().then(c => { setCards(c); setLoading(false); });
+    fetchReleases().then(r => {
+      setReleases(r);
+      const stored = getActiveReleaseIds();
+      setActiveIds(stored ?? r.map(rel => rel.id));
+      setLoading(false);
+    });
   }, []);
 
-  const startGame = useCallback((m: Mode) => {
-    if (cards.length < 40) return;
-    const shuffled = [...cards].sort(() => Math.random() - 0.5);
-    const playerDeck = shuffled.slice(0, 20);
-    const opponentDeck = shuffled.slice(20, 40);
-    setMode(m);
-    setState(createGame(playerDeck, opponentDeck, learningMode));
-  }, [cards, learningMode]);
+  const toggleRelease = useCallback((id: number) => {
+    setActiveIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, []);
+
+  const saveAsDefault = useCallback(() => {
+    setActiveReleaseIds(activeReleaseIds);
+  }, [activeReleaseIds]);
+
+  const startGame = useCallback(async (m: Mode) => {
+    if (activeReleaseIds.length < 2 || starting) return;
+    setStarting(true);
+    try {
+      const pool = await fetchCardsByReleaseIds(activeReleaseIds);
+      const { playerDeck, opponentDeck } = buildBalancedDecks(pool);
+      setMode(m);
+      setState(createGame(playerDeck, opponentDeck, learningMode));
+    } finally {
+      setStarting(false);
+    }
+  }, [activeReleaseIds, learningMode, starting]);
 
   // AI auto-play — paused while an event announcement is pending
   useEffect(() => {
@@ -51,7 +71,6 @@ export default function GamePage() {
           move.targetCreatureId, move.targetSide,
           move.secondTargetId, move.secondTargetSide
         );
-        // Show event announcement; apply state only after dismiss
         if (next) {
           setAiEventPending({ card, nextState: endTurn(next) });
           return;
@@ -71,15 +90,67 @@ export default function GamePage() {
   if (loading) {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
-        Loading cards...
+        Loading...
       </div>
     );
   }
 
+  const tooFew = activeReleaseIds.length < 2;
+
   if (!state) {
     return (
-      <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-        <h1 style={{ color: '#fff', fontSize: '2em', margin: 0 }}>Choose Game Mode</h1>
+      <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '0 24px' }}>
+        <h1 style={{ color: '#fff', fontSize: '2em', margin: 0, fontFamily: "'Cinzel', serif" }}>Choose Game Mode</h1>
+
+        <div style={{ width: '100%', maxWidth: 760 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <span style={{ color: '#ccc', fontSize: '0.9em' }}>Active Releases</span>
+            <button
+              onClick={() => setActiveIds(releases.map(r => r.id))}
+              style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 5, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8em' }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setActiveIds([])}
+              style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 5, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8em' }}
+            >
+              None
+            </button>
+            <button
+              onClick={saveAsDefault}
+              style={{ background: '#222', color: '#aaa', border: '1px solid #333', borderRadius: 5, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8em' }}
+            >
+              Save as Default
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {releases.map(r => (
+              <button
+                key={r.id}
+                onClick={() => toggleRelease(r.id)}
+                style={{
+                  background: activeReleaseIds.includes(r.id) ? r.color_hex : '#111',
+                  color: '#fff',
+                  border: `2px solid ${r.color_hex}`,
+                  borderRadius: 7,
+                  padding: '6px 13px',
+                  cursor: 'pointer',
+                  fontSize: '0.82em',
+                  fontWeight: activeReleaseIds.includes(r.id) ? 700 : 400,
+                }}
+              >
+                {r.icon} {r.name}
+              </button>
+            ))}
+          </div>
+          {tooFew && (
+            <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
+              Select at least 2 releases to play.
+            </p>
+          )}
+        </div>
+
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#aaa', fontSize: '0.95em' }}>
           <input
             type="checkbox"
@@ -89,20 +160,36 @@ export default function GamePage() {
           />
           🧮 Learning Mode (answer math questions when playing modifiers)
         </label>
+
         <div style={{ display: 'flex', gap: 16 }}>
           <button
             onClick={() => startGame('ai')}
-            style={{ background: '#1a237e', color: '#fff', border: '2px solid #5c6bc0', borderRadius: 10, padding: '14px 32px', fontSize: '1.1em', cursor: 'pointer' }}
+            disabled={tooFew || starting}
+            style={{
+              background: tooFew || starting ? '#111' : '#1a237e',
+              color: tooFew || starting ? '#444' : '#fff',
+              border: `2px solid ${tooFew || starting ? '#333' : '#5c6bc0'}`,
+              borderRadius: 10, padding: '14px 32px', fontSize: '1.1em',
+              cursor: tooFew || starting ? 'not-allowed' : 'pointer',
+            }}
           >
-            ⚔ vs AI
+            {starting ? '...' : '⚔ vs AI'}
           </button>
           <button
             onClick={() => startGame('pass-and-play')}
-            style={{ background: '#1b5e20', color: '#fff', border: '2px solid #81c784', borderRadius: 10, padding: '14px 32px', fontSize: '1.1em', cursor: 'pointer' }}
+            disabled={tooFew || starting}
+            style={{
+              background: tooFew || starting ? '#111' : '#1b5e20',
+              color: tooFew || starting ? '#444' : '#fff',
+              border: `2px solid ${tooFew || starting ? '#333' : '#81c784'}`,
+              borderRadius: 10, padding: '14px 32px', fontSize: '1.1em',
+              cursor: tooFew || starting ? 'not-allowed' : 'pointer',
+            }}
           >
             👥 Pass & Play
           </button>
         </div>
+
         <button
           onClick={() => setState(null)}
           style={{ background: 'none', color: '#555', border: 'none', cursor: 'pointer', fontSize: '0.9em', marginTop: 8 }}
