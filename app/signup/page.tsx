@@ -64,7 +64,15 @@ export default function SignupPage() {
       .insert({ id: data.user.id, username });
 
     if (insertError) {
-      setError(insertError.message);
+      // Sign out to avoid leaving user in broken state
+      await supabase.auth.signOut();
+
+      // Map Postgres error code to user-friendly message
+      const errorMessage = insertError.code === '23505'
+        ? 'That username is already taken.'
+        : insertError.message;
+
+      setError(errorMessage);
       setLoading(false);
       return;
     }
