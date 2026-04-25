@@ -217,7 +217,7 @@ export default function GamePage() {
           // No DB prefs yet — seed from localStorage and persist silently
           const idsToUse = localIds ?? r.map(rel => rel.id);
           setActiveIds(idsToUse);
-          await savePreferencesToDb(supabase, { activeReleaseIds: idsToUse, learningMode: false });
+          await savePreferencesToDb(supabase, { activeReleaseIds: idsToUse, learningMode: dbPrefs.learningMode });
         }
         setLearningMode(dbPrefs.learningMode);
       } else {
