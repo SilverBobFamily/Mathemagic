@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchReleases, fetchCardsByReleaseIds } from '@/lib/supabase';
 import { getActiveReleaseIds, setActiveReleaseIds } from '@/lib/releases';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { loadPreferencesFromDb, savePreferencesToDb } from '@/lib/preferences';
 import { buildBalancedDecks } from '@/lib/deck';
 import { createGame, endTurn, passTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
 import { chooseAiMove } from '@/lib/ai';
@@ -199,11 +201,31 @@ export default function GamePage() {
   const [coinFlip, setCoinFlip] = useState<PendingCoinFlip | null>(null);
 
   useEffect(() => {
-    fetchReleases().then(r => {
+    fetchReleases().then(async r => {
       setReleases(r);
-      const stored = getActiveReleaseIds();
-      setActiveIds(stored ?? r.map(rel => rel.id));
       setOptionsState(getGameOptions());
+
+      const supabase = createSupabaseBrowserClient();
+      const dbPrefs = await loadPreferencesFromDb(supabase);
+
+      if (dbPrefs) {
+        // Logged in — use DB preferences
+        const localIds = getActiveReleaseIds();
+        if (dbPrefs.activeReleaseIds !== null) {
+          setActiveIds(dbPrefs.activeReleaseIds);
+        } else {
+          // No DB prefs yet — seed from localStorage and persist silently
+          const idsToUse = localIds ?? r.map(rel => rel.id);
+          setActiveIds(idsToUse);
+          await savePreferencesToDb(supabase, { activeReleaseIds: idsToUse, learningMode: false });
+        }
+        setLearningMode(dbPrefs.learningMode);
+      } else {
+        // Logged out — use localStorage
+        const stored = getActiveReleaseIds();
+        setActiveIds(stored ?? r.map(rel => rel.id));
+      }
+
       setLoading(false);
     });
   }, []);
@@ -221,9 +243,11 @@ export default function GamePage() {
     setActiveIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }, []);
 
-  const saveAsDefault = useCallback(() => {
-    setActiveReleaseIds(activeReleaseIds);
-  }, [activeReleaseIds]);
+  const saveAsDefault = useCallback(async () => {
+    setActiveReleaseIds(activeReleaseIds); // always update localStorage
+    const supabase = createSupabaseBrowserClient();
+    await savePreferencesToDb(supabase, { activeReleaseIds, learningMode });
+  }, [activeReleaseIds, learningMode]);
 
   const startGame = useCallback(async (m: Mode) => {
     if (!options || activeReleaseIds.length < 2 || starting) return;
