@@ -1,4 +1,5 @@
-import type { Card, FieldCard, PlayerState, GameState, Side } from './types';
+import type { Card, FieldCard, PlayerState, GameState, GameOptions, Side } from './types';
+import { DEFAULT_OPTIONS } from './options';
 
 export function computeCardValue(fc: FieldCard): number {
   if (fc.zeroed) return 0;
@@ -29,38 +30,67 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function makePlayerState(deck: Card[]): PlayerState {
+function makePlayerState(
+  deck: Card[],
+  opts: Pick<GameOptions, 'handSize' | 'setAsideCount' | 'guaranteedEvent'>
+): PlayerState {
+  const { handSize, setAsideCount, guaranteedEvent } = opts;
   const hasCreatures = deck.some(c => c.type === 'creature');
+  const hasEvents = deck.some(c => c.type === 'event');
+
   let shuffled = shuffle(deck);
-  // Guarantee at least one creature in the opening hand (positions 4–6 after aside)
+  // Guarantee at least one creature in the opening hand
   if (hasCreatures) {
-    while (!shuffled.slice(4, 7).some(c => c.type === 'creature')) {
+    while (!shuffled.slice(setAsideCount, setAsideCount + handSize).some(c => c.type === 'creature')) {
       shuffled = shuffle(deck);
     }
   }
+  // Guarantee event card is not buried in the aside — swap it into the deck portion
+  if (guaranteedEvent && hasEvents) {
+    const eventInAsideIdx = shuffled.slice(0, setAsideCount).findIndex(c => c.type === 'event');
+    if (eventInAsideIdx !== -1) {
+      const deckStart = setAsideCount + handSize;
+      const swapInDeck = shuffled.slice(deckStart).findIndex(c => c.type !== 'event');
+      if (swapInDeck !== -1) {
+        const abs = deckStart + swapInDeck;
+        [shuffled[eventInAsideIdx], shuffled[abs]] = [shuffled[abs], shuffled[eventInAsideIdx]];
+      }
+    }
+  }
+
   return {
-    aside: shuffled.slice(0, 4),
-    hand: shuffled.slice(4, 7),
-    deck: shuffled.slice(7),
+    aside: shuffled.slice(0, setAsideCount),
+    hand: shuffled.slice(setAsideCount, setAsideCount + handSize),
+    deck: shuffled.slice(setAsideCount + handSize),
     field: [],
     playedCount: 0,
   };
 }
 
-export function createGame(playerDeck: Card[], opponentDeck: Card[], learningMode = false): GameState {
-  const firstTurn: Side = Math.random() < 0.5 ? 'player' : 'opponent';
-  const base: GameState = {
+export function createGame(
+  playerDeck: Card[],
+  opponentDeck: Card[],
+  learningMode = false,
+  options: GameOptions = DEFAULT_OPTIONS,
+  firstPlayerOverride?: Side
+): GameState {
+  const firstTurn: Side = firstPlayerOverride
+    ?? (options.firstPlayer === 'player' ? 'player'
+      : options.firstPlayer === 'opponent' ? 'opponent'
+      : Math.random() < 0.5 ? 'player' : 'opponent');
+
+  return {
     phase: 'playing',
     turn: firstTurn,
     firstTurn,
     round: 1,
-    player: makePlayerState(playerDeck),
-    opponent: makePlayerState(opponentDeck),
+    player: makePlayerState(playerDeck, options),
+    opponent: makePlayerState(opponentDeck, options),
     winner: null,
     pendingCard: null,
     learningMode,
+    options,
   };
-  return base;
 }
 
 export function computeExpectedValue(fc: FieldCard, newModifierCard: Card): number {
@@ -132,7 +162,7 @@ export function passTurn(state: GameState): GameState {
 }
 
 export function isGameOver(state: GameState): boolean {
-  return state.player.playedCount >= 16 && state.opponent.playedCount >= 16;
+  return state.player.playedCount >= state.options.maxPlays && state.opponent.playedCount >= state.options.maxPlays;
 }
 
 export function playModifier(
