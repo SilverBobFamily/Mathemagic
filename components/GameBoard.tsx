@@ -298,6 +298,15 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame, aiEve
         </div>
       </div>
 
+      {/* Sudden death banner */}
+      {state.phase === 'sudden_death' && !gameOver && (
+        <div style={{ background: '#4a1010', borderBottom: '1px solid #7f0000', padding: '6px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: '1.1em' }}>⚡</span>
+          <span style={{ color: '#ef9a9a', fontWeight: 700, fontFamily: "'Cinzel', serif", fontSize: '0.9em', letterSpacing: '0.05em' }}>SUDDEN DEATH</span>
+          <span style={{ color: '#888', fontSize: '0.8em' }}>— play your set-aside cards. Highest score wins.</span>
+        </div>
+      )}
+
       {/* Status bar */}
       <div style={{ background: '#111', padding: '7px 18px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85em', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ color: '#555' }}>Round {state.round} · {isMyTurn ? 'Your turn' : "Opponent's turn"}</span>
