@@ -92,8 +92,7 @@ export default function OnlineGamePage({
 
     return () => {
       if (channel) {
-        const supabaseClient = createSupabaseBrowserClient();
-        supabaseClient.removeChannel(channel);
+        supabase.removeChannel(channel);
       }
     };
   }, [id]);
@@ -205,6 +204,14 @@ export default function OnlineGamePage({
             </button>
           </>
         )}
+      </div>
+    );
+  }
+
+  if (mySide === null && game?.status === 'active') {
+    return (
+      <div style={{ textAlign: 'center', padding: 48 }}>
+        <p style={{ color: '#aaa', fontFamily: "'Cinzel', serif" }}>This game is in progress.</p>
       </div>
     );
   }
