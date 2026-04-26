@@ -121,16 +121,16 @@ describe('createGame', () => {
   beforeEach(() => jest.spyOn(Math, 'random').mockReturnValue(0.1));
   afterEach(() => jest.restoreAllMocks());
 
-  it('deals 3 cards to each hand', () => {
+  it('deals 4 cards to each hand by default', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
-    expect(state.player.hand).toHaveLength(3);
-    expect(state.opponent.hand).toHaveLength(3);
+    expect(state.player.hand).toHaveLength(4);
+    expect(state.opponent.hand).toHaveLength(4);
   });
 
-  it('sets aside 4 cards, leaving 13 in deck', () => {
+  it('sets aside 4 cards, leaving 12 in deck', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
     expect(state.player.aside).toHaveLength(4);
-    expect(state.player.deck).toHaveLength(13);
+    expect(state.player.deck).toHaveLength(12);
   });
 
   it('starts on round 1, phase playing, with a random first turn', () => {
@@ -155,19 +155,21 @@ describe('playCreature', () => {
   it('moves card from player hand to player field', () => {
     let state = createGame(makeDeck(20), makeDeck(20));
     const cardId = state.player.hand[0].id;
+    const handSizeBefore = state.player.hand.length;
     state = playCreature(state, cardId, 'player');
     expect(state.player.field).toHaveLength(1);
     expect(state.player.field[0].card.id).toBe(cardId);
-    expect(state.player.hand).toHaveLength(2);
+    expect(state.player.hand).toHaveLength(handSizeBefore - 1);
     expect(state.player.playedCount).toBe(1);
   });
 
   it('can play a creature on the opponent side', () => {
     let state = createGame(makeDeck(20), makeDeck(20));
     const cardId = state.player.hand[0].id;
+    const handSizeBefore = state.player.hand.length;
     state = playCreature(state, cardId, 'opponent');
     expect(state.opponent.field).toHaveLength(1);
-    expect(state.player.hand).toHaveLength(2);
+    expect(state.player.hand).toHaveLength(handSizeBefore - 1);
   });
 });
 

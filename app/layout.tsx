@@ -1,12 +1,27 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { createSupabaseServerClient } from '@/lib/supabase-server';
+import SignOutButton from '@/components/SignOutButton';
 
 export const metadata: Metadata = {
   title: 'Mathemagic',
   description: 'A collectible card game where the math is the magic.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let username: string | null = null;
+  if (user) {
+    const { data } = await supabase
+      .from('players')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+    username = data?.username ?? null;
+  }
+
   return (
     <html lang="en">
       <head>
@@ -21,8 +36,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }}>
           <a href="/" style={{ color: '#ffd54f', fontWeight: 700, textDecoration: 'none', fontSize: '1.1em', fontFamily: "'Cinzel', serif" }}>⚡ Mathemagic</a>
           <a href="/game" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play</a>
+          <a href="/lobby" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play Online</a>
           <a href="/cards" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Cards</a>
           <a href="/settings" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Settings</a>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, alignItems: 'center' }}>
+            {user ? (
+              <>
+                <span style={{ color: '#ccc', fontSize: '0.95em', fontFamily: "'Crimson Text', serif" }}>
+                  {username ?? user.email}
+                </span>
+                <SignOutButton />
+              </>
+            ) : (
+              <a href="/login" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Sign in</a>
+            )}
+          </div>
         </nav>
         {children}
       </body>

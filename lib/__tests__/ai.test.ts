@@ -16,7 +16,7 @@ describe('chooseAiMove', () => {
   it('returns a move when opponent has cards', () => {
     const state = createGame(makeDeck(20), makeDeck(20));
     const oppState = { ...state, turn: 'opponent' as const };
-    const move = chooseAiMove(oppState);
+    const move = chooseAiMove(oppState, 'hard');
     expect(move).not.toBeNull();
     expect(move!.cardId).toBeDefined();
     expect(['player', 'opponent']).toContain(move!.targetSide);
@@ -30,7 +30,7 @@ describe('chooseAiMove', () => {
       turn: 'opponent',
       opponent: { ...base.opponent, hand: [negCard] },
     };
-    const move = chooseAiMove(state)!;
+    const move = chooseAiMove(state, 'hard')!;
     expect(move.cardId).toBe(negCard.id);
     expect(move.targetSide).toBe('player');
   });
@@ -43,7 +43,7 @@ describe('chooseAiMove', () => {
       turn: 'opponent',
       opponent: { ...base.opponent, hand: [posCard] },
     };
-    const move = chooseAiMove(state)!;
+    const move = chooseAiMove(state, 'hard')!;
     expect(move.cardId).toBe(posCard.id);
     expect(move.targetSide).toBe('opponent');
   });
@@ -55,6 +55,22 @@ describe('chooseAiMove', () => {
       turn: 'opponent',
       opponent: { ...base.opponent, hand: [] },
     };
-    expect(chooseAiMove(state)).toBeNull();
+    expect(chooseAiMove(state, 'hard')).toBeNull();
+  });
+
+  it('occasionally makes mistakes on easy difficulty', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.1); // always < 0.35
+    const base = createGame(makeDeck(20), makeDeck(20));
+    const negCard = makeCard(1, -5);
+    const state: GameState = {
+      ...base,
+      turn: 'opponent',
+      opponent: { ...base.opponent, hand: [negCard] },
+    };
+    // With Math.random() = 0.1 < 0.35, easy mode always triggers buildRandomMove
+    const move = chooseAiMove(state, 'easy')!;
+    // buildRandomMove on a creature returns targetSide 'opponent' (not 'player' like optimal)
+    expect(move).not.toBeNull();
+    jest.restoreAllMocks();
   });
 });

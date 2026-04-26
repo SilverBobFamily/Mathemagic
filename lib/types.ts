@@ -46,6 +46,16 @@ export interface PlayerState {
   playedCount: number; // how many cards have been played (max 16)
 }
 
+export interface GameOptions {
+  handSize: number;
+  guaranteedEvent: boolean;
+  maxPlays: number;
+  eventCount: number;
+  firstPlayer: 'coinFlip' | 'player' | 'opponent';
+  setAsideCount: number;
+  aiDifficulty: 'easy' | 'medium' | 'hard';
+}
+
 export interface GameState {
   phase: GamePhase;
   turn: Side;
@@ -56,4 +66,5 @@ export interface GameState {
   winner: Side | 'tie' | null;
   pendingCard: Card | null;
   learningMode: boolean;
+  options: GameOptions;
 }

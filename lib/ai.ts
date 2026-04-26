@@ -9,7 +9,27 @@ export interface AiMove {
   secondTargetSide?: Side;
 }
 
-export function chooseAiMove(state: GameState): AiMove | null {
+function buildRandomMove(state: GameState): AiMove | null {
+  const hand = state.opponent.hand;
+  if (hand.length === 0) return null;
+  const card = hand[Math.floor(Math.random() * hand.length)];
+  if (card.type === 'creature') {
+    return { cardId: card.id, targetSide: 'opponent' };
+  }
+  const allCreatures = [...state.player.field, ...state.opponent.field];
+  if (allCreatures.length === 0) {
+    return { cardId: card.id, targetSide: 'opponent' };
+  }
+  const target = allCreatures[Math.floor(Math.random() * allCreatures.length)];
+  const targetSide: Side = state.player.field.some(fc => fc.card.id === target.card.id) ? 'player' : 'opponent';
+  return { cardId: card.id, targetSide, targetCreatureId: target.card.id };
+}
+
+export function chooseAiMove(state: GameState, difficulty: 'easy' | 'medium' | 'hard' = 'hard'): AiMove | null {
+  const mistakeChance = difficulty === 'easy' ? 0.35 : difficulty === 'medium' ? 0.15 : 0;
+  if (mistakeChance > 0 && Math.random() < mistakeChance) {
+    return buildRandomMove(state);
+  }
   const hand = state.opponent.hand;
   if (hand.length === 0) return null;
 
