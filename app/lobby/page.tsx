@@ -123,14 +123,14 @@ export default function LobbyPage() {
   return (
     <div style={{
       minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', gap: 32, padding: '40px 24px',
+      justifyContent: 'center', gap: 32, padding: '40px 48px', width: '100%', boxSizing: 'border-box',
     }}>
       <h1 style={{ color: '#fff', fontFamily: "'Cinzel', serif", margin: 0, fontSize: '2em' }}>
         Play Online
       </h1>
 
       {/* Release picker */}
-      <div style={{ width: '100%', maxWidth: 1000 }}>
+      <div style={{ width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <span style={{ color: '#ccc', fontSize: '0.9em' }}>Active Releases</span>
           <button onClick={() => setActiveIds(releases.map(r => r.id))} style={chipBtn}>All</button>
@@ -171,7 +171,7 @@ export default function LobbyPage() {
 
       {/* Create Game */}
       <div style={{
-        width: '100%', maxWidth: 1000, background: '#0d0d0d',
+        width: '100%', background: '#0d0d0d', boxSizing: 'border-box' as const,
         border: '1px solid #222', borderRadius: 12, padding: '24px 28px',
       }}>
         <h2 style={{ color: '#fff', fontFamily: "'Cinzel', serif", margin: '0 0 8px', fontSize: '1.2em' }}>
@@ -200,7 +200,7 @@ export default function LobbyPage() {
 
       {/* Join Game */}
       <div style={{
-        width: '100%', maxWidth: 1000, background: '#0d0d0d',
+        width: '100%', background: '#0d0d0d', boxSizing: 'border-box' as const,
         border: '1px solid #222', borderRadius: 12, padding: '24px 28px',
       }}>
         <h2 style={{ color: '#fff', fontFamily: "'Cinzel', serif", margin: '0 0 8px', fontSize: '1.2em' }}>
