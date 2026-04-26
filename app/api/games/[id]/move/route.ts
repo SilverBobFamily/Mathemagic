@@ -40,6 +40,10 @@ export async function POST(
     return NextResponse.json({ error: 'Game not found' }, { status: 404 });
   }
 
+  if (game.status === 'finished') {
+    return NextResponse.json({ error: 'Game is already finished' }, { status: 409 });
+  }
+
   const callerSide =
     game.player1_id === user.id
       ? 'player'
@@ -48,7 +52,7 @@ export async function POST(
       : null;
 
   if (!callerSide) {
-    return NextResponse.json({ error: 'Not your turn' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   if (game.active_side !== callerSide) {
@@ -56,24 +60,33 @@ export async function POST(
   }
 
   const body: MoveBody = await request.json();
-  const state = game.state_json as GameState;
+  const currentState: GameState = game.state_json as GameState;
 
   let nextState: GameState;
   switch (body.type) {
     case 'playCreature':
-      nextState = playCreature(state, body.cardId, body.targetSide ?? callerSide as Side);
+      nextState = playCreature(currentState, body.cardId, body.targetSide ?? callerSide as Side);
+      if (nextState === currentState) {
+        return NextResponse.json({ error: 'Invalid move' }, { status: 422 });
+      }
       break;
     case 'playModifier':
-      nextState = playModifier(state, body.cardId, body.targetCreatureId, body.targetSide);
+      nextState = playModifier(currentState, body.cardId, body.targetCreatureId, body.targetSide);
+      if (nextState === currentState) {
+        return NextResponse.json({ error: 'Invalid move' }, { status: 422 });
+      }
       break;
     case 'playEvent':
-      nextState = playEvent(state, body.cardId, body.targetCreatureId, body.targetSide, body.secondTargetId, body.secondTargetSide);
+      nextState = playEvent(currentState, body.cardId, body.targetCreatureId, body.targetSide, body.secondTargetId, body.secondTargetSide);
+      if (nextState === currentState) {
+        return NextResponse.json({ error: 'Invalid move' }, { status: 422 });
+      }
       break;
     case 'endTurn':
-      nextState = endTurn(state);
+      nextState = endTurn(currentState);
       break;
     case 'passTurn':
-      nextState = passTurn(state);
+      nextState = passTurn(currentState);
       break;
     default:
       return NextResponse.json({ error: 'Invalid move type' }, { status: 400 });
