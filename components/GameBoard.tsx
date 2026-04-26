@@ -13,8 +13,9 @@ import { useWindowWidth } from '@/hooks/useWindowWidth';
 interface Props {
   state: GameState;
   onStateChange: (s: GameState) => void;
-  mode: 'ai' | 'pass-and-play';
+  mode: 'ai' | 'pass-and-play' | 'online';
   onNewGame: () => void;
+  mySide?: Side;
   // For AI-played events: game page passes the announcement here
   aiEventAnnouncement?: { card: Card; playedBy: 'opponent' } | null;
   onAiEventDismissed?: () => void;
@@ -27,7 +28,7 @@ interface ModifierFlash {
   newValue: number;
 }
 
-export default function GameBoard({ state, onStateChange, mode, onNewGame, aiEventAnnouncement, onAiEventDismissed }: Props) {
+export default function GameBoard({ state, onStateChange, mode, onNewGame, mySide, aiEventAnnouncement, onAiEventDismissed }: Props) {
   const [modalData, setModalData] = useState<{ fieldCard?: FieldCardType; handCard?: Card } | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [firstEventTarget, setFirstEventTarget] = useState<{ creatureId: number; side: Side } | null>(null);
@@ -59,8 +60,8 @@ export default function GameBoard({ state, onStateChange, mode, onNewGame, aiEve
     }
   }, [state.turn, mode]);
 
-  const activeSide: Side = mode === 'pass-and-play' ? state.turn : 'player';
-  const isMyTurn = mode === 'pass-and-play' ? true : state.turn === 'player';
+  const activeSide: Side = mode === 'pass-and-play' ? state.turn : mode === 'online' ? (mySide ?? 'player') : 'player';
+  const isMyTurn = mode === 'pass-and-play' ? true : mode === 'online' ? state.turn === (mySide ?? 'player') : state.turn === 'player';
 
   const playerScore = computeScore(state.player.field);
   const opponentScore = computeScore(state.opponent.field);

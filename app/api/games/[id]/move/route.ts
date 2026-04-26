@@ -15,7 +15,8 @@ type MoveBody =
   | { type: 'playModifier'; cardId: number; targetCreatureId: number; targetSide: Side }
   | { type: 'playEvent'; cardId: number; targetCreatureId: number; targetSide: Side; secondTargetId?: number; secondTargetSide?: Side }
   | { type: 'endTurn' }
-  | { type: 'passTurn' };
+  | { type: 'passTurn' }
+  | { type: 'setState'; stateJson: GameState };
 
 export async function POST(
   request: NextRequest,
@@ -87,6 +88,9 @@ export async function POST(
       break;
     case 'passTurn':
       nextState = passTurn(currentState);
+      break;
+    case 'setState':
+      nextState = body.stateJson;
       break;
     default:
       return NextResponse.json({ error: 'Invalid move type' }, { status: 400 });
