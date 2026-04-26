@@ -5,7 +5,7 @@ import { getActiveReleaseIds, setActiveReleaseIds } from '@/lib/releases';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { loadPreferencesFromDb, savePreferencesToDb } from '@/lib/preferences';
 import { buildBalancedDecks } from '@/lib/deck';
-import { createGame, endTurn, passTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
+import { createGame, endTurn, passTurn, isGameOver, shouldEnterSuddenDeath, enterSuddenDeath, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
 import { chooseAiMove } from '@/lib/ai';
 import { getGameOptions, setGameOptions } from '@/lib/options';
 import GameBoard from '@/components/GameBoard';
@@ -323,6 +323,23 @@ export default function GamePage() {
     setState(aiEventPending.nextState);
     setAiEventPending(null);
   }, [aiEventPending]);
+
+  // Transition to sudden death when the regular game ends in a tie
+  useEffect(() => {
+    if (state && shouldEnterSuddenDeath(state)) {
+      setState(enterSuddenDeath(state));
+    }
+  }, [state]);
+
+  // Auto-pass in sudden death when the current player has no cards left.
+  // The AI effect already handles the opponent's empty hand in AI mode.
+  useEffect(() => {
+    if (!state || state.phase !== 'sudden_death' || isGameOver(state)) return;
+    if (state[state.turn].hand.length > 0) return;
+    if (mode === 'ai' && state.turn === 'opponent') return;
+    const timer = setTimeout(() => setState(s => s ? passTurn(s) : s), 400);
+    return () => clearTimeout(timer);
+  }, [state, mode]);
 
   if (loading || !options) {
     return (
