@@ -27,14 +27,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
       </head>
       <body style={{ margin: 0, background: '#0d0d1a', color: '#eee', fontFamily: "'Crimson Text', serif", minHeight: '100vh' }}>
         <nav style={{
           background: '#111', borderBottom: '1px solid #333',
           padding: '10px 24px', display: 'flex', gap: 28, alignItems: 'center',
         }}>
-          <a href="/" style={{ color: '#ffd54f', fontWeight: 700, textDecoration: 'none', fontSize: '1.1em', fontFamily: "'Cinzel', serif" }}>⚡ Mathemagic</a>
+          <a href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+            <img src="/mathemagic-logo.svg" alt="Mathemagic" style={{ height: 108 }} />
+          </a>
           <a href="/game" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play</a>
           <a href="/lobby" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play Online</a>
           <a href="/cards" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Cards</a>
@@ -52,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </nav>
-        {children}
+        <div style={{ fontSize: '0.67em' }}>{children}</div>
       </body>
     </html>
   );
