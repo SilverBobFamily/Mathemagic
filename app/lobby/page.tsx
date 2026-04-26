@@ -14,6 +14,7 @@ export default function LobbyPage() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [activeReleaseIds, setActiveIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [joinId, setJoinId] = useState('');
@@ -27,12 +28,17 @@ export default function LobbyPage() {
       setAuthChecked(true);
     });
 
-    fetchReleases().then(r => {
-      setReleases(r);
-      const stored = getActiveReleaseIds();
-      setActiveIds(stored ?? r.map(rel => rel.id));
-      setLoading(false);
-    });
+    fetchReleases()
+      .then(r => {
+        setReleases(r);
+        const stored = getActiveReleaseIds();
+        setActiveIds(stored ?? r.map(rel => rel.id));
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoadError('Failed to load releases.');
+        setLoading(false);
+      });
   }, []);
 
   const toggleRelease = useCallback((id: number) => {
@@ -70,7 +76,7 @@ export default function LobbyPage() {
     setJoining(true);
     setJoinError(null);
     // Basic UUID format check
-    if (!/^[0-9a-f-]{36}$/i.test(trimmed)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
       setJoinError('Invalid game ID. Enter a valid UUID.');
       setJoining(false);
       return;
@@ -82,6 +88,14 @@ export default function LobbyPage() {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
         Loading...
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef5350' }}>
+        {loadError}
       </div>
     );
   }
