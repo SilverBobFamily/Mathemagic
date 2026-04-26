@@ -16,6 +16,16 @@ create policy "games: participants update" on games for update
   using (auth.uid() = player1_id or auth.uid() = player2_id);
 create policy "games: authenticated insert" on games for insert
   with check (auth.uid() = player1_id);
+-- Allow any authenticated user to view a waiting game (needed to join via invite link)
+create policy "games: view waiting games" on games for select
+  using (status = 'waiting' and auth.uid() is not null);
+-- Allow any authenticated user to claim the player2 slot on a waiting game
+create policy "games: join as player2" on games for update
+  using (status = 'waiting' and player2_id is null and auth.uid() is not null)
+  with check (
+    auth.uid() = player2_id
+    and status = 'active'
+  );
 -- updated_at trigger
 create or replace function set_updated_at()
 returns trigger language plpgsql as $$
