@@ -7,7 +7,9 @@ import {
   playModifier,
   playEvent,
   isGameOver,
+  getWinner,
 } from '@/lib/GameEngine';
+import { createSupabaseServiceClient } from '@/lib/supabase-service';
 import type { GameState, Side } from '@/lib/types';
 
 type MoveBody =
@@ -109,6 +111,28 @@ export async function POST(
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  // Award coins/stats when game just finished
+  if (newStatus === 'finished' && game.status !== 'finished' && game.player1_id && game.player2_id) {
+    const serviceClient = createSupabaseServiceClient();
+    const winner = getWinner(nextState);
+    if (winner === 'player') {
+      await serviceClient.rpc('award_win', {
+        p_winner_id: game.player1_id,
+        p_loser_id: game.player2_id,
+      });
+    } else if (winner === 'opponent') {
+      await serviceClient.rpc('award_win', {
+        p_winner_id: game.player2_id,
+        p_loser_id: game.player1_id,
+      });
+    } else {
+      await serviceClient.rpc('award_tie', {
+        p_player1_id: game.player1_id,
+        p_player2_id: game.player2_id,
+      });
+    }
   }
 
   return NextResponse.json({ state: nextState });
