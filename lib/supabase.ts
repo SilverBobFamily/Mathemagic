@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Card, Release } from './types';
 
 export const supabase = createClient(
@@ -6,8 +6,10 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function fetchReleases(): Promise<Release[]> {
-  const { data, error } = await supabase
+// Pass an authenticated client so RLS can include private releases the user has access to.
+// Falls back to the anon client (public releases only) when no client is provided.
+export async function fetchReleases(client: SupabaseClient = supabase): Promise<Release[]> {
+  const { data, error } = await client
     .from('releases')
     .select('*')
     .order('number');
@@ -36,6 +38,18 @@ export async function fetchCardsByReleaseIds(ids: number[]): Promise<Card[]> {
     .order('name');
   if (error) throw error;
   return data;
+}
+
+export async function updateReleasePrivacy(
+  client: SupabaseClient,
+  releaseId: number,
+  isPrivate: boolean
+): Promise<void> {
+  const { error } = await client
+    .from('releases')
+    .update({ private: isPrivate })
+    .eq('id', releaseId);
+  if (error) throw error;
 }
 
 export async function fetchAllCards(): Promise<Card[]> {

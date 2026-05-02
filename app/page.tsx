@@ -1,7 +1,7 @@
 export default function Home() {
   return (
     <main style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 }}>
-      <h1 style={{ fontSize: '3em', color: '#fff', margin: 0 }}>⚡ Mathemagic</h1>
+      <img src="/mathemagic-logo-bg.png" alt="Mathemagic" style={{ width: '100%', maxWidth: 560, borderRadius: 16 }} />
       <p style={{ color: '#aaa', fontSize: '1.15em', textAlign: 'center', maxWidth: 500, lineHeight: 1.6 }}>
         A collectible card game where the math is the magic. Build your score with creatures, items, actions, and events — then outwit your opponent.
       </p>

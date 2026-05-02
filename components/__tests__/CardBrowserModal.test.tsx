@@ -9,7 +9,7 @@ const makeCard = (id: number, name: string): Card => ({
   flavor_text: 'Test flavor', effect_text: null,
 });
 
-const release: Release = { id: 1, name: 'Test Release', icon: '🏺', number: 1, color_hex: '#5c6bc0' };
+const release: Release = { id: 1, name: 'Test Release', icon: '🏺', number: 1, color_hex: '#5c6bc0', private: false };
 
 const cards = [makeCard(1, 'Alpha'), makeCard(2, 'Beta'), makeCard(3, 'Gamma')];
 

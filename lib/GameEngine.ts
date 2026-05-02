@@ -143,13 +143,16 @@ export function playCreature(state: GameState, cardId: number, targetSide: Side)
 export function endTurn(state: GameState): GameState {
   const nextTurn: Side = state.turn === 'player' ? 'opponent' : 'player';
   const newRound = nextTurn === state.firstTurn ? state.round + 1 : state.round;
-  // Neither player draws on the first turn — the second player starts with their initial 3 cards only
+  if (state.phase === 'sudden_death') {
+    return { ...state, turn: nextTurn, round: newRound };
+  }
+  // Neither player draws on the first turn — the second player starts with their initial hand only
   const shouldDraw = !(state.round === 1 && nextTurn !== state.firstTurn);
   const next = shouldDraw ? drawCard(state, nextTurn) : state;
   return { ...next, turn: nextTurn, round: newRound };
 }
 
-// Pass the current turn without playing a card. Counts as using one of the player's 16 turns
+// Pass the current turn without playing a card. Counts as using one of the player's turns
 // so the game can always progress even when no valid play exists.
 export function passTurn(state: GameState): GameState {
   const side = state.turn;
@@ -162,7 +165,28 @@ export function passTurn(state: GameState): GameState {
 }
 
 export function isGameOver(state: GameState): boolean {
+  if (state.phase === 'sudden_death') {
+    return state.player.hand.length === 0 && state.opponent.hand.length === 0;
+  }
   return state.player.playedCount >= state.options.maxPlays && state.opponent.playedCount >= state.options.maxPlays;
+}
+
+export function shouldEnterSuddenDeath(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (!isGameOver(state)) return false;
+  const p = computeScore(state.player.field);
+  const o = computeScore(state.opponent.field);
+  if (p !== o) return false;
+  return state.player.aside.length > 0 || state.opponent.aside.length > 0;
+}
+
+export function enterSuddenDeath(state: GameState): GameState {
+  return {
+    ...state,
+    phase: 'sudden_death',
+    player: { ...state.player, hand: [...state.player.aside], aside: [], deck: [] },
+    opponent: { ...state.opponent, hand: [...state.opponent.aside], aside: [], deck: [] },
+  };
 }
 
 export function playModifier(

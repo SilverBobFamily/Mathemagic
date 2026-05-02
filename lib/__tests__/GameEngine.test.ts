@@ -1,4 +1,4 @@
-import { computeCardValue, computeScore, createGame, drawCard, endTurn, playCreature, isGameOver, playModifier, playEvent, getWinner } from '../GameEngine';
+import { computeCardValue, computeScore, createGame, drawCard, endTurn, playCreature, isGameOver, shouldEnterSuddenDeath, enterSuddenDeath, playModifier, playEvent, getWinner } from '../GameEngine';
 import type { FieldCard, Card } from '../types';
 
 const makeCreature = (value: number): Card => ({
@@ -219,6 +219,75 @@ describe('isGameOver', () => {
       opponent: { ...state.opponent, playedCount: 16 },
     };
     expect(isGameOver(over)).toBe(true);
+  });
+
+  it('returns true in sudden_death when both hands are empty', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const sd = {
+      ...state,
+      phase: 'sudden_death' as const,
+      player: { ...state.player, hand: [] },
+      opponent: { ...state.opponent, hand: [] },
+    };
+    expect(isGameOver(sd)).toBe(true);
+  });
+
+  it('returns false in sudden_death while a hand still has cards', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const sd = {
+      ...state,
+      phase: 'sudden_death' as const,
+      player: { ...state.player, hand: [makeCreature(3)] },
+      opponent: { ...state.opponent, hand: [] },
+    };
+    expect(isGameOver(sd)).toBe(false);
+  });
+});
+
+describe('shouldEnterSuddenDeath / enterSuddenDeath', () => {
+  it('returns false when game is not over', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    expect(shouldEnterSuddenDeath(state)).toBe(false);
+  });
+
+  it('returns false when scores are not tied', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const notTied = {
+      ...state,
+      player: { ...state.player, playedCount: 16, field: [{ card: makeCreature(5), modifiers: [], zeroed: false }] },
+      opponent: { ...state.opponent, playedCount: 16, field: [{ card: makeCreature(3), modifiers: [], zeroed: false }] },
+    };
+    expect(shouldEnterSuddenDeath(notTied)).toBe(false);
+  });
+
+  it('returns false when tied but no aside cards remain', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const tiedNoAside = {
+      ...state,
+      player: { ...state.player, playedCount: 16, aside: [] },
+      opponent: { ...state.opponent, playedCount: 16, aside: [] },
+    };
+    expect(shouldEnterSuddenDeath(tiedNoAside)).toBe(false);
+  });
+
+  it('returns true when tied at max plays with aside cards', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const tied = {
+      ...state,
+      player: { ...state.player, playedCount: 16 },
+      opponent: { ...state.opponent, playedCount: 16 },
+    };
+    expect(shouldEnterSuddenDeath(tied)).toBe(true);
+  });
+
+  it('enterSuddenDeath moves aside cards to hand and clears aside/deck', () => {
+    const state = createGame(makeDeck(20), makeDeck(20));
+    const asideCards = state.player.aside;
+    const sd = enterSuddenDeath(state);
+    expect(sd.phase).toBe('sudden_death');
+    expect(sd.player.hand).toEqual(asideCards);
+    expect(sd.player.aside).toHaveLength(0);
+    expect(sd.player.deck).toHaveLength(0);
   });
 });
 

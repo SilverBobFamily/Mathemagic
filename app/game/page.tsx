@@ -5,9 +5,9 @@ import { getActiveReleaseIds, setActiveReleaseIds } from '@/lib/releases';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { loadPreferencesFromDb, savePreferencesToDb } from '@/lib/preferences';
 import { buildBalancedDecks } from '@/lib/deck';
-import { createGame, endTurn, passTurn, isGameOver, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
+import { createGame, endTurn, passTurn, isGameOver, shouldEnterSuddenDeath, enterSuddenDeath, playCreature, playModifier, playEvent } from '@/lib/GameEngine';
 import { chooseAiMove } from '@/lib/ai';
-import { getGameOptions, setGameOptions } from '@/lib/options';
+import { getGameOptions, setGameOptions, DEFAULT_OPTIONS } from '@/lib/options';
 import GameBoard from '@/components/GameBoard';
 import type { Release, Card, GameState, GameOptions, Side } from '@/lib/types';
 
@@ -198,14 +198,15 @@ export default function GamePage() {
   const [aiEventPending, setAiEventPending] = useState<{ card: Card; nextState: GameState } | null>(null);
   const [options, setOptionsState] = useState<GameOptions | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [releasesOpen, setReleasesOpen] = useState(false);
   const [coinFlip, setCoinFlip] = useState<PendingCoinFlip | null>(null);
 
   useEffect(() => {
-    fetchReleases().then(async r => {
+    const supabase = createSupabaseBrowserClient();
+    fetchReleases(supabase).then(async r => {
       setReleases(r);
       setOptionsState(getGameOptions());
 
-      const supabase = createSupabaseBrowserClient();
       const dbPrefs = await loadPreferencesFromDb(supabase);
 
       if (dbPrefs) {
@@ -275,7 +276,7 @@ export default function GamePage() {
     setCoinFlip(prev => prev ? { ...prev, stage: 'flipping', call } : prev);
     setTimeout(() => {
       const result: 'heads' | 'tails' = Math.random() < 0.5 ? 'heads' : 'tails';
-      const winner: Side = result === 'heads' ? 'player' : 'opponent';
+      const winner: Side = result === call ? 'player' : 'opponent';
       setCoinFlip(prev => prev ? { ...prev, stage: 'result', result, winner } : prev);
     }, 1200);
   }, []);
@@ -324,6 +325,23 @@ export default function GamePage() {
     setAiEventPending(null);
   }, [aiEventPending]);
 
+  // Transition to sudden death when the regular game ends in a tie
+  useEffect(() => {
+    if (state && shouldEnterSuddenDeath(state)) {
+      setState(enterSuddenDeath(state));
+    }
+  }, [state]);
+
+  // Auto-pass in sudden death when the current player has no cards left.
+  // The AI effect already handles the opponent's empty hand in AI mode.
+  useEffect(() => {
+    if (!state || state.phase !== 'sudden_death' || isGameOver(state)) return;
+    if (state[state.turn].hand.length > 0) return;
+    if (mode === 'ai' && state.turn === 'opponent') return;
+    const timer = setTimeout(() => setState(s => s ? passTurn(s) : s), 400);
+    return () => clearTimeout(timer);
+  }, [state, mode]);
+
   if (loading || !options) {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
@@ -339,48 +357,63 @@ export default function GamePage() {
       <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '0 24px' }}>
         <h1 style={{ color: '#fff', fontSize: '2em', margin: 0, fontFamily: "'Cinzel', serif" }}>Choose Game Mode</h1>
 
-        {/* Release selection */}
-        <div style={{ width: '100%', maxWidth: 760 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <span style={{ color: '#ccc', fontSize: '0.9em' }}>Active Releases</span>
-            <button onClick={() => setActiveIds(releases.map(r => r.id))} style={chipBtn}>All</button>
-            <button onClick={() => setActiveIds([])} style={chipBtn}>None</button>
-            <button onClick={saveAsDefault} style={chipBtn}>Save as Default</button>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {releases.map(r => (
-              <button
-                key={r.id}
-                onClick={() => toggleRelease(r.id)}
-                style={{
-                  background: activeReleaseIds.includes(r.id) ? r.color_hex : '#111',
-                  color: '#fff',
-                  border: `2px solid ${r.color_hex}`,
-                  borderRadius: 7,
-                  padding: '6px 13px',
-                  cursor: 'pointer',
-                  fontSize: '0.82em',
-                  fontWeight: activeReleaseIds.includes(r.id) ? 700 : 400,
-                }}
-              >
-                {r.icon} {r.name}
-              </button>
-            ))}
-          </div>
-          {tooFew && (
-            <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
-              Select at least 2 releases to play.
-            </p>
-          )}
-          {startError && (
-            <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
-              {startError}
-            </p>
+        {/* Release selection accordion */}
+        <div style={{ width: '100%', maxWidth: 1200 }}>
+          <button
+            onClick={() => setReleasesOpen(o => !o)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#888', fontSize: '0.85em', padding: '4px 0',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <span style={{ fontSize: '0.75em' }}>{releasesOpen ? '▼' : '▶'}</span>
+            Active Releases
+            {!releasesOpen && <span style={{ color: '#555', fontWeight: 400 }}> · {activeReleaseIds.length} of {releases.length}</span>}
+          </button>
+          {releasesOpen && (
+            <div style={{ marginTop: 10, padding: '16px 20px', background: '#0d0d0d', border: '1px solid #222', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <button onClick={() => setActiveIds(releases.map(r => r.id))} style={chipBtn}>All</button>
+                <button onClick={() => setActiveIds([])} style={chipBtn}>None</button>
+                <button onClick={saveAsDefault} style={chipBtn}>Save as Default</button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {releases.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => toggleRelease(r.id)}
+                    style={{
+                      background: activeReleaseIds.includes(r.id) ? r.color_hex : '#111',
+                      color: '#fff',
+                      border: `2px solid ${r.color_hex}`,
+                      borderRadius: 7,
+                      padding: '6px 13px',
+                      cursor: 'pointer',
+                      fontSize: '0.82em',
+                      fontWeight: activeReleaseIds.includes(r.id) ? 700 : 400,
+                    }}
+                  >
+                    {r.icon} {r.name}
+                  </button>
+                ))}
+              </div>
+              {tooFew && (
+                <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
+                  Select at least 2 releases to play.
+                </p>
+              )}
+              {startError && (
+                <p style={{ color: '#ef5350', fontSize: '0.85em', margin: '10px 0 0' }}>
+                  {startError}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
         {/* Game Options accordion */}
-        <div style={{ width: '100%', maxWidth: 760 }}>
+        <div style={{ width: '100%', maxWidth: 1200 }}>
           <button
             onClick={() => setOptionsOpen(o => !o)}
             style={{
@@ -389,8 +422,9 @@ export default function GamePage() {
               display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
-            <span style={{ fontSize: '0.75em' }}>{optionsOpen ? '▲' : '▼'}</span>
+            <span style={{ fontSize: '0.75em' }}>{optionsOpen ? '▼' : '▶'}</span>
             Game Options
+            {!optionsOpen && (() => { const s = nonDefaultSummary(options); return s ? <span style={{ color: '#555', fontWeight: 400 }}> · {s}</span> : null; })()}
           </button>
           {optionsOpen && (
             <div style={{
@@ -522,6 +556,19 @@ export default function GamePage() {
       />
     </div>
   );
+}
+
+function nonDefaultSummary(opts: GameOptions): string {
+  const d = DEFAULT_OPTIONS;
+  const parts: string[] = [];
+  if (opts.handSize !== d.handSize) parts.push(`Hand ${opts.handSize}`);
+  if (opts.setAsideCount !== d.setAsideCount) parts.push(`Aside ${opts.setAsideCount}`);
+  if (opts.eventCount !== d.eventCount) parts.push(`Events ${opts.eventCount}`);
+  if (opts.maxPlays !== d.maxPlays) parts.push(`Max ${opts.maxPlays}`);
+  if (opts.guaranteedEvent !== d.guaranteedEvent) parts.push('No Guar. Event');
+  if (opts.firstPlayer !== d.firstPlayer) parts.push(opts.firstPlayer === 'player' ? 'P1 First' : 'P2 First');
+  if (opts.aiDifficulty !== d.aiDifficulty) parts.push(opts.aiDifficulty === 'easy' ? 'Easy AI' : 'Hard AI');
+  return parts.join(' · ');
 }
 
 const chipBtn: React.CSSProperties = {

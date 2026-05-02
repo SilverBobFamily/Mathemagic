@@ -29,7 +29,7 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect,
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const answer = parseInt(input.trim(), 10);
+    const answer = parseFloat(input.trim());
     if (answer === expected) {
       onCorrect();
     } else {
@@ -95,6 +95,7 @@ export default function LearningModePrompt({ fieldCard, modifierCard, onCorrect,
           <input
             ref={inputRef}
             type="number"
+            step="any"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Enter your answer..."
