@@ -13,13 +13,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { data: { user } } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let isAdmin = false;
   if (user) {
     const { data } = await supabase
       .from('players')
-      .select('username')
+      .select('username, is_admin')
       .eq('id', user.id)
       .single();
     username = data?.username ?? null;
+    isAdmin = data?.is_admin ?? false;
   }
 
   return (
@@ -41,6 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <a href="/lobby" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play Online</a>
           <a href="/cards" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Cards</a>
           <a href="/settings" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Settings</a>
+          {isAdmin && <a href="/admin" style={{ color: '#ffb74d', textDecoration: 'none', fontSize: '0.95em' }}>Admin</a>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, alignItems: 'center' }}>
             {user ? (
               <>
