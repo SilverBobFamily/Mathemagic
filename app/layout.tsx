@@ -13,13 +13,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { data: { user } } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let avatarUrl: string | null = null;
   if (user) {
     const { data } = await supabase
       .from('players')
-      .select('username')
+      .select('username, avatar_url')
       .eq('id', user.id)
       .single();
     username = data?.username ?? null;
+    avatarUrl = (data as { avatar_url?: string | null } | null)?.avatar_url ?? null;
   }
 
   return (
@@ -42,9 +44,35 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, alignItems: 'center' }}>
             {user ? (
               <>
-                <span style={{ color: '#ccc', fontSize: '0.95em', fontFamily: "'Crimson Text', serif" }}>
-                  {username ?? user.email}
-                </span>
+                <a
+                  href="/profile"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}
+                >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: '#1a237e', border: '2px solid #5c6bc0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden', flexShrink: 0,
+                  }}>
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{
+                        color: '#fff', fontSize: '0.62em',
+                        fontFamily: "'Cinzel', serif", fontWeight: 700,
+                      }}>
+                        {(username ?? user.email ?? '').slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#aaa', fontSize: '0.85em' }}>
+                    {username ?? user.email}
+                  </span>
+                </a>
                 <SignOutButton />
               </>
             ) : (
