@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 export default async function PublicProfilePage({
@@ -14,13 +15,7 @@ export default async function PublicProfilePage({
     .eq('username', username)
     .single();
 
-  if (!profile) {
-    return (
-      <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
-        Player not found.
-      </div>
-    );
-  }
+  if (!profile) notFound();
 
   const winRate = profile.games_played > 0
     ? Math.round((profile.games_won / profile.games_played) * 100)

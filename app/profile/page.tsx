@@ -38,6 +38,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +51,8 @@ export default function ProfilePage() {
       try {
         const p = await getProfile(user.id);
         setProfile(p);
+      } catch {
+        setLoadError('Failed to load profile. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -79,6 +82,13 @@ export default function ProfilePage() {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
         Loading…
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef5350' }}>
+        {loadError}
       </div>
     );
   }
