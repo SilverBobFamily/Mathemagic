@@ -17,6 +17,7 @@ export default function LobbyPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createdGameId, setCreatedGameId] = useState<string | null>(null);
   const [joinId, setJoinId] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -63,7 +64,8 @@ export default function LobbyPage() {
         throw new Error(json.error ?? `Server error ${res.status}`);
       }
       const { id } = await res.json();
-      window.location.href = `/game/${id}`;
+      setCreatedGameId(id);
+      setCreating(false);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create game.');
       setCreating(false);
@@ -197,6 +199,66 @@ export default function LobbyPage() {
           {creating ? 'Creating...' : 'Create Game'}
         </button>
       </div>
+
+      {/* Invite overlay — shown after game is created */}
+      {createdGameId && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: 24,
+        }}>
+          <div style={{
+            background: '#111', border: '1px solid #333', borderRadius: 16,
+            padding: '36px 32px', maxWidth: 520, width: '100%', boxSizing: 'border-box',
+          }}>
+            <h2 style={{ color: '#fff', fontFamily: "'Cinzel', serif", margin: '0 0 8px', fontSize: '1.4em' }}>
+              Game Created!
+            </h2>
+            <p style={{ color: '#888', fontSize: '0.88em', margin: '0 0 20px', fontFamily: "'Crimson Text', serif" }}>
+              Share this link with your opponent. The game starts when they join.
+            </p>
+            <div style={{
+              background: '#0d0d0d', border: '1px solid #333', borderRadius: 8,
+              padding: '10px 14px', color: '#aaa', fontSize: '0.82em',
+              wordBreak: 'break-all', marginBottom: 12,
+            }}>
+              {window.location.origin}/game/{createdGameId}
+            </div>
+            <button
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/game/${createdGameId}`)}
+              style={{
+                width: '100%', background: '#1a237e', color: '#fff',
+                border: '2px solid #5c6bc0', borderRadius: 8,
+                padding: '10px', fontSize: '0.95em', cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Copy Invite Link
+            </button>
+            <button
+              onClick={() => { window.location.href = `/game/${createdGameId}`; }}
+              style={{
+                width: '100%', background: '#1b5e20', color: '#fff',
+                border: '2px solid #81c784', borderRadius: 8,
+                padding: '10px', fontSize: '0.95em', cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              Go to Game
+            </button>
+            <button
+              onClick={() => setCreatedGameId(null)}
+              style={{
+                width: '100%', background: 'none', color: '#666',
+                border: '1px solid #333', borderRadius: 8,
+                padding: '10px', fontSize: '0.9em', cursor: 'pointer',
+              }}
+            >
+              Back to Lobby
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Join Game */}
       <div style={{
