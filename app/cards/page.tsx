@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { fetchReleases, fetchCardsByRelease } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import type { Release, Card } from '@/lib/types';
 import CardComponent from '@/components/Card';
 import CardBrowserModal from '@/components/CardBrowserModal';
@@ -12,7 +13,8 @@ export default function CardsPage() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchReleases().then(r => { setReleases(r); setSelected(r[0] ?? null); });
+    const supabase = createSupabaseBrowserClient();
+    fetchReleases(supabase).then(r => { setReleases(r); setSelected(r[0] ?? null); });
   }, []);
 
   useEffect(() => {

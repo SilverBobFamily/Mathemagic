@@ -9,6 +9,7 @@ export interface Release {
   icon: string;
   number: number;
   color_hex: string;
+  private: boolean;
 }
 
 export interface Card {

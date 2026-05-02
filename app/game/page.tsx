@@ -202,11 +202,11 @@ export default function GamePage() {
   const [coinFlip, setCoinFlip] = useState<PendingCoinFlip | null>(null);
 
   useEffect(() => {
-    fetchReleases().then(async r => {
+    const supabase = createSupabaseBrowserClient();
+    fetchReleases(supabase).then(async r => {
       setReleases(r);
       setOptionsState(getGameOptions());
 
-      const supabase = createSupabaseBrowserClient();
       const dbPrefs = await loadPreferencesFromDb(supabase);
 
       if (dbPrefs) {

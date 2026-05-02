@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { fetchReleases } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getActiveReleaseIds, setActiveReleaseIds } from '@/lib/releases';
 import type { Release } from '@/lib/types';
 
@@ -10,7 +11,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetchReleases().then(r => {
+    const supabase = createSupabaseBrowserClient();
+    fetchReleases(supabase).then(r => {
       setReleases(r);
       const stored = getActiveReleaseIds();
       setActiveIds(stored ?? r.map(rel => rel.id));
