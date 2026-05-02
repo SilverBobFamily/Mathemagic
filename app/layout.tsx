@@ -40,6 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <img src="/mathemagic-logo.svg" alt="Mathemagic" style={{ height: 108 }} />
           </a>
           <a href="/game" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play</a>
+          <a href="/lobby" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play Online</a>
           <a href="/cards" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Cards</a>
           <a href="/settings" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Settings</a>
           {isAdmin && <a href="/admin" style={{ color: '#ffb74d', textDecoration: 'none', fontSize: '0.95em' }}>Admin</a>}
