@@ -7,7 +7,9 @@ import {
   playModifier,
   playEvent,
   isGameOver,
+  getWinner,
 } from '@/lib/GameEngine';
+import { createSupabaseServiceClient } from '@/lib/supabase-service';
 import type { GameState, Side } from '@/lib/types';
 
 type MoveBody =
@@ -90,6 +92,9 @@ export async function POST(
       nextState = passTurn(currentState);
       break;
     case 'setState':
+      if (process.env.NODE_ENV !== 'development') {
+        return NextResponse.json({ error: 'Invalid move type' }, { status: 400 });
+      }
       nextState = body.stateJson;
       break;
     default:
@@ -109,6 +114,32 @@ export async function POST(
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  // Award coins/stats when game just finished
+  if (newStatus === 'finished' && game.status !== 'finished' && game.player1_id && game.player2_id) {
+    const serviceClient = createSupabaseServiceClient();
+    const winner = getWinner(nextState);
+    let awardError: { message: string } | null = null;
+    if (winner === 'player') {
+      ({ error: awardError } = await serviceClient.rpc('award_win', {
+        p_winner_id: game.player1_id,
+        p_loser_id: game.player2_id,
+      }));
+    } else if (winner === 'opponent') {
+      ({ error: awardError } = await serviceClient.rpc('award_win', {
+        p_winner_id: game.player2_id,
+        p_loser_id: game.player1_id,
+      }));
+    } else {
+      ({ error: awardError } = await serviceClient.rpc('award_tie', {
+        p_player1_id: game.player1_id,
+        p_player2_id: game.player2_id,
+      }));
+    }
+    if (awardError) {
+      console.error('[coin-award] failed for game', id, awardError.message);
+    }
   }
 
   return NextResponse.json({ state: nextState });

@@ -153,9 +153,9 @@ export default function OnlineGamePage({
     );
   }
 
-  // Waiting for opponent to join
-  if (mySide === null && game && game.status === 'waiting') {
-    const isPlayer1 = game.player1_id === userId;
+  // Waiting for opponent to join — show to both player1 (mySide='player') and uninvited viewers
+  if (game && game.status === 'waiting' && (mySide === 'player' || mySide === null)) {
+    const isPlayer1 = mySide === 'player' || game.player1_id === userId;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
     return (
       <div style={{

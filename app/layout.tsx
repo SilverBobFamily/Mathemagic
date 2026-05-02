@@ -13,15 +13,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { data: { user } } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let avatarUrl: string | null = null;
   let isAdmin = false;
   if (user) {
     const { data } = await supabase
       .from('players')
-      .select('username, is_admin')
+      .select('username, avatar_url, is_admin')
       .eq('id', user.id)
       .single();
     username = data?.username ?? null;
-    isAdmin = data?.is_admin ?? false;
+    avatarUrl = (data as { avatar_url?: string | null } | null)?.avatar_url ?? null;
+    isAdmin = (data as { is_admin?: boolean } | null)?.is_admin ?? false;
   }
 
   return (
@@ -41,15 +43,42 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </a>
           <a href="/game" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play</a>
           <a href="/lobby" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Play Online</a>
+          {user && <a href="/games" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>My Games</a>}
           <a href="/cards" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Cards</a>
           <a href="/settings" style={{ color: '#aaa', textDecoration: 'none', fontSize: '0.95em' }}>Settings</a>
           {isAdmin && <a href="/admin" style={{ color: '#ffb74d', textDecoration: 'none', fontSize: '0.95em' }}>Admin</a>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, alignItems: 'center' }}>
             {user ? (
               <>
-                <span style={{ color: '#ccc', fontSize: '0.95em', fontFamily: "'Crimson Text', serif" }}>
-                  {username ?? user.email}
-                </span>
+                <a
+                  href="/profile"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}
+                >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: '#1a237e', border: '2px solid #5c6bc0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden', flexShrink: 0,
+                  }}>
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{
+                        color: '#fff', fontSize: '0.62em',
+                        fontFamily: "'Cinzel', serif", fontWeight: 700,
+                      }}>
+                        {(username ?? user.email ?? '').slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#aaa', fontSize: '0.85em' }}>
+                    {username ?? user.email}
+                  </span>
+                </a>
                 <SignOutButton />
               </>
             ) : (
