@@ -23,6 +23,16 @@ function sample(h, arr, n) {
 const hashSeed = (a, b) => ((a * 2654435761) ^ (b * 40503 + 977)) | 0;
 
 /* ---------- data ---------- */
+/* Real players, slightly bent. */
+const HITTERS = ['Derek Jetter','Ken Griffly Jr.','Barry Bondz','Babe Ruthe','Hank Aron','Willie Mayes','Mickey Mantel','Ted Willians','Joe DiMadgio','Jackie Robinsen','Roberto Clementi','Cal Ripkin Jr.','Tony Gwinn','Wade Boggz','Ozzie Smitt','Rickey Henderzon','Mike Trowt','Mookie Bettz','Aaron Judd','Juan Sotto','Ronald Acunya','Freddie Freedman','Bryce Harpur','Manny Machadoh','Fernando Tatiz Jr.','Vlad Guerrera Jr.','Bobby Whitt Jr.','Julio Rodriguex','Corey Seegar','Jose Altuvay','Francisco Lindar','Pete Alonzo','Paul Goldschmitt','Nolan Arenada','Albert Pujolz','Miguel Cabrero','David Ortez','Manny Ramires','Chipper Jonez','Ichiro Suzaki','Frank Thoma','Jim Thomey','Ryne Sandburg','Ernie Banx','Kirby Puckette','George Brette','Mike Schmitt','Johnny Benchley','Yogi Berrie','Pete Rosey','Reggie Jaxon','Rod Carewe','Joe Morgen','Craig Biggo','Jeff Bagwill','Larry Walkar','Todd Heltin','Buster Posie','Adrian Beltry','Ivan Rodriquez','Joey Vottle','Gunnar Hendersen','Elly De La Cruise','Corbin Carrol','Kyle Tucket','Yordan Alvares','Adley Rutschmann','Rafael Devors','Bo Bichett','Jose Ramirex','Christian Yelick','Andrew McCutchon','Kris Brynt','Anthony Rizzoh','Javy Baes','Matt Olsen','Austin Rilley','Marcus Semian','Cody Bellinjer','Salvador Perezz','Byron Buxtin','Carlos Correra','Trea Turnor','Kyle Schwarbar','J.T. Realmutto','Xander Bogaerds','Dustin Pedroya','Josh Hamiltin','Evan Longorio','Giancarlo Stantin','Pete Crow-Armstrung','Wyatt Langferd','Jackson Chorio','Ketel Marty','Shohei Ohtoni'];
+const PITCHERS = ['Josh Smoltz','Greg Matlox','Tom Glovine','Pedro Martinex','Randy Johnstone','Roger Clemmons','Nolan Rayan','Sandy Koufox','Bob Gibsen','Tom Seever','Mariano Riviera','Trevor Hoffmore','Dennis Eckerslee','Clayton Kershew','Justin Verlaine','Max Scherzar','Jacob deGroom','Gerrit Kole','Felix Hernandes','Roy Holliday','CC Sabbathia','Curt Schilly','Johan Santanna','Zack Grienke','David Prize','Chris Sail','Madison Bumgardner','Tim Lincecomb','Corey Kluver','Stephen Strassburger','Aroldis Chapmen','Craig Kimbrow','Billy Wagoner','Jon Lestor','Cole Hammels','Blake Snail','Spencer Stryder','Paul Skeens','Tarik Skubble','Corbin Burns','Shane Bieberman','Walker Bueller','Yoshi Yamamota','Dwight Goodin','Fernando Valenzuelo','Bert Blylevin','Satchel Paage','Cy Youngblood','Orel Hershizer','Jim Palmore','Juan Marichol','Fergie Jenkens','Rollie Fingerz','Goose Gossarge','Kenley Jansin','Josh Haider','Edwin Dias','Kodai Senka','Logan Webber','Zack Wheelor','Aaron Nolo','Framber Valdex','Dylan Ceese'];
+let TAKEN = null; // Set of names already on the team being generated
+function pickName(h, list) {
+  let n = pick(h, list);
+  for (let i = 0; TAKEN && TAKEN.has(n) && i < 12; i++) n = pick(h, list);
+  if (TAKEN) TAKEN.add(n);
+  return n;
+}
 const FIRST = ['Mo','Tito','Dex','Rudy','Lou','Cal','Jimmy','Hank','Ozzie','Pablo','Nate','Gus','Ty','Wally','Marty','Ike','Felix','Dante','Cruz','Buck','Sal','Rex','Boog','Chuy','Flip','Gabe','Ivan','Kip','Lenny','Milo','Pete','Quincy','Rocco','Stu','Toby','Vic','Walt','Yogi','Zeke','Andre'];
 const LAST = ['Vega','Okafor','Lindqvist','Brannigan','Tanaka','Mulligan','Delgado','Kowalski','Nguyen','Abernathy','Castillo','Dubois','Fitch','Gallo','Haverty','Ibarra','Jankowski','Kimura','Lombardi','Moreau','Novak','Ortega','Pruitt','Quigley','Rosario','Sato','Tran','Underhill','Voss','Whitaker','Yoo','Zimmer','Baptiste','Crumb','Dooley','Espinoza','Flanagan','Grizzly','Hobbs','Jones'];
 const POS = ['C','1B','2B','3B','SS','LF','CF','RF','DH'];
@@ -88,12 +98,57 @@ const ARCH = {
   duel:  { name: 'PITCHING DUEL', desc: 'Ace arm, deep pen, glove-first bats.',           bias: { con: -4, pow: -2, def: 6 },           pit: 11, relic: 'radar_gun' },
 };
 
-const OPP_NAMES = [
-  ['Harbor Sharks', 'Mill Town Millers', 'Cedar Falls Foxes', 'Dustbowl Dogs', 'Rocktown Rattlers', 'Bayou Barons', 'Salt Flat Stallions', 'Pinewood Pirates'],
-  ['Iron City Forge', 'Capital Comets', 'Lakeshore Loons', 'Gold Coast Gators'],
-];
-const OPP_COLORS = [['#b13e53', '#f4f4f4'], ['#3b5dc9', '#ffcd75'], ['#ef7d57', '#1a1c2c'], ['#5d275d', '#73eff7'], ['#257179', '#f4f4f4'], ['#ffcd75', '#333c57'], ['#41a6f6', '#f4f4f4'], ['#a7f070', '#1a1c2c'], ['#566c86', '#ef7d57'], ['#b13e53', '#ffcd75'], ['#29366f', '#a7f070'], ['#ffcd75', '#b13e53']];
-const STAGE_LABELS = ['GAME 1', 'GAME 2', 'GAME 3', 'GAME 4', 'GAME 5', 'GAME 6', 'GAME 7', 'GAME 8', 'WILD CARD', 'DIVISION SERIES', 'PENNANT', 'WORLD SERIES'];
+/* Real cities and leagues, nicknames swapped for synonyms, real team colors [primary, secondary]. */
+const TEAMS = {
+  BAL: { city: 'Baltimore',     nick: 'Orange Birds',  lg: 'AL', div: 'East',    colors: ['#DF4601', '#1a1c2c'] },
+  BOS: { city: 'Boston',        nick: 'Crimson Hose',  lg: 'AL', div: 'East',    colors: ['#BD3039', '#0C2340'] },
+  NYY: { city: 'New York',      nick: 'Pinstripes',    lg: 'AL', div: 'East',    colors: ['#0C2340', '#C4CED3'] },
+  TB:  { city: 'Tampa Bay',     nick: 'Sunbeams',      lg: 'AL', div: 'East',    colors: ['#092C5C', '#8FBCE6'] },
+  TOR: { city: 'Toronto',       nick: 'Bluebirds',     lg: 'AL', div: 'East',    colors: ['#134A8E', '#E8291C'] },
+  CWS: { city: 'Chicago',       nick: 'Pale Hose',     lg: 'AL', div: 'Central', colors: ['#27251F', '#C4CED4'] },
+  CLE: { city: 'Cleveland',     nick: 'Sentinels',     lg: 'AL', div: 'Central', colors: ['#00385D', '#E50022'] },
+  DET: { city: 'Detroit',       nick: 'Big Cats',      lg: 'AL', div: 'Central', colors: ['#0C2340', '#FA4616'] },
+  KC:  { city: 'Kansas City',   nick: 'Monarchs',      lg: 'AL', div: 'Central', colors: ['#004687', '#BD9B60'] },
+  MIN: { city: 'Minnesota',     nick: 'Doubles',       lg: 'AL', div: 'Central', colors: ['#002B5C', '#D31145'] },
+  HOU: { city: 'Houston',       nick: 'Rocketeers',    lg: 'AL', div: 'West',    colors: ['#002D62', '#EB6E1F'] },
+  LAA: { city: 'Anaheim',       nick: 'Halos',         lg: 'AL', div: 'West',    colors: ['#BA0021', '#003263'] },
+  ATH: { city: 'Sacramento',    nick: 'Elephants',     lg: 'AL', div: 'West',    colors: ['#003831', '#EFB21E'] },
+  SEA: { city: 'Seattle',       nick: 'Sailors',       lg: 'AL', div: 'West',    colors: ['#0C2C56', '#005C5C'] },
+  TEX: { city: 'Texas',         nick: 'Lawmen',        lg: 'AL', div: 'West',    colors: ['#003278', '#C0111F'] },
+  ATL: { city: 'Atlanta',       nick: 'Warriors',      lg: 'NL', div: 'East',    colors: ['#CE1141', '#13274F'] },
+  MIA: { city: 'Miami',         nick: 'Swordfish',     lg: 'NL', div: 'East',    colors: ['#00A3E0', '#EF3340'] },
+  NYM: { city: 'New York',      nick: 'Metros',        lg: 'NL', div: 'East',    colors: ['#002D72', '#FF5910'] },
+  PHI: { city: 'Philadelphia',  nick: 'Liberty',       lg: 'NL', div: 'East',    colors: ['#E81828', '#002D72'] },
+  WSH: { city: 'Washington',    nick: 'Senators',      lg: 'NL', div: 'East',    colors: ['#AB0003', '#14225A'] },
+  CHC: { city: 'Chicago',       nick: 'Bear Cubs',     lg: 'NL', div: 'Central', colors: ['#0E3386', '#CC3433'] },
+  CIN: { city: 'Cincinnati',    nick: 'Redlegs',       lg: 'NL', div: 'Central', colors: ['#C6011F', '#1a1c2c'] },
+  MIL: { city: 'Milwaukee',     nick: 'Brewmasters',   lg: 'NL', div: 'Central', colors: ['#12284B', '#FFC52F'] },
+  PIT: { city: 'Pittsburgh',    nick: 'Buccos',        lg: 'NL', div: 'Central', colors: ['#27251F', '#FDB827'] },
+  STL: { city: 'St. Louis',     nick: 'Redbirds',      lg: 'NL', div: 'Central', colors: ['#C41E3A', '#0C2340'] },
+  ARI: { city: 'Arizona',       nick: 'Rattlers',      lg: 'NL', div: 'West',    colors: ['#A71930', '#E3D4AD'] },
+  COL: { city: 'Colorado',      nick: 'Peaks',         lg: 'NL', div: 'West',    colors: ['#33006F', '#C4CED4'] },
+  LAD: { city: 'Los Angeles',   nick: 'Blue Crew',     lg: 'NL', div: 'West',    colors: ['#005A9C', '#EF3E42'] },
+  SD:  { city: 'San Diego',     nick: 'Friars',        lg: 'NL', div: 'West',    colors: ['#2F241D', '#FFC425'] },
+  SF:  { city: 'San Francisco', nick: 'Titans',        lg: 'NL', div: 'West',    colors: ['#FD5A1E', '#27251F'] },
+};
+const LEAGUES = { AL: 'American League', NL: 'National League' };
+const teamName = k => TEAMS[k].city + ' ' + TEAMS[k].nick;
+function stageLabel(run, st) {
+  const lg = TEAMS[run.team] ? TEAMS[run.team].lg : 'AL';
+  return ['GAME 1', 'GAME 2', 'GAME 3', 'GAME 4', 'GAME 5', 'GAME 6', 'GAME 7', 'GAME 8', 'WILD CARD', lg + 'DS', lg + 'CS', 'WORLD SERIES'][st];
+}
+const STAGE_LABELS = ['GAME 1', 'GAME 2', 'GAME 3', 'GAME 4', 'GAME 5', 'GAME 6', 'GAME 7', 'GAME 8', 'WILD CARD', 'DIVISION SERIES', 'LEAGUE CHAMPIONSHIP', 'WORLD SERIES'];
+/* 8 league games (division rivals first), 3 league playoff rounds, World Series vs the other league */
+function makeSchedule(h, us) {
+  const me = TEAMS[us];
+  const keys = Object.keys(TEAMS).filter(k => k !== us);
+  const rivals = keys.filter(k => TEAMS[k].lg === me.lg && TEAMS[k].div === me.div);
+  const league = keys.filter(k => TEAMS[k].lg === me.lg && TEAMS[k].div !== me.div);
+  const other = keys.filter(k => TEAMS[k].lg !== me.lg);
+  const reg = sample(h, rivals, 4).concat(sample(h, league, 4));
+  const po = sample(h, league.concat(rivals), 3);
+  return reg.concat(po, [pick(h, other)]);
+}
 const TOTAL_STAGES = 12;
 const MAX_LOSSES = 3;
 const GAME_LEN = 6;
@@ -103,13 +158,13 @@ const newId = h => 'p' + Math.floor(rf(h) * 1e9).toString(36);
 function genBatter(h, q, bias, traitP) {
   bias = bias || {};
   const g = k => clamp(Math.round(norm(h, q + (bias[k] || 0), 8)), 20, 99);
-  const p = { id: newId(h), kind: 'bat', name: pick(h, FIRST) + ' ' + pick(h, LAST), con: g('con'), pow: g('pow'), eye: g('eye'), spd: g('spd'), def: g('def'), trait: null, look: ri(h, 1, 999999) };
+  const p = { id: newId(h), kind: 'bat', name: pickName(h, HITTERS), con: g('con'), pow: g('pow'), eye: g('eye'), spd: g('spd'), def: g('def'), trait: null, look: ri(h, 1, 999999) };
   if (chance(h, traitP == null ? 0.22 : traitP)) p.trait = pick(h, Object.keys(BAT_TRAITS));
   return p;
 }
 function genPitcher(h, q, kind, traitP) {
   const g = (m) => clamp(Math.round(norm(h, m, 8)), 20, 99);
-  const p = { id: newId(h), kind, name: pick(h, FIRST) + ' ' + pick(h, LAST), stf: g(q), ctl: g(q), sta: kind === 'sp' ? ri(h, 13, 19) : ri(h, 5, 8), trait: null, look: ri(h, 1, 999999) };
+  const p = { id: newId(h), kind, name: pickName(h, PITCHERS), stf: g(q), ctl: g(q), sta: kind === 'sp' ? ri(h, 13, 19) : ri(h, 5, 8), trait: null, look: ri(h, 1, 999999) };
   if (chance(h, traitP == null ? 0.25 : traitP)) {
     const keys = Object.keys(PIT_TRAITS).filter(k => k !== 'closer' || kind === 'rp');
     p.trait = pick(h, keys);
@@ -124,21 +179,25 @@ const playerPrice = p => clamp(Math.round(2 + (ovr(p) - 45) / 3), 3, 13);
 /* ---------- run (the roguelite layer) ---------- */
 function makeStartTeam(h, key) {
   const a = ARCH[key];
+  TAKEN = new Set();
   const lineup = POS.map(() => genBatter(h, 50, a.bias, 0.2));
   const pitchers = [genPitcher(h, 52 + a.pit, 'sp', 0.4), genPitcher(h, 50 + a.pit, 'rp', 0.3), genPitcher(h, 48 + a.pit, 'rp', 0.3)];
+  TAKEN = null;
   return { lineup, pitchers };
 }
 function newDraft(seed) {
   const h = { rs: seed | 0 };
   return Object.keys(ARCH).map(k => ({ key: k, name: ARCH[k].name, desc: ARCH[k].desc, relic: ARCH[k].relic, team: makeStartTeam(h, k) }));
 }
-function startRun(opt, seed, settings) {
+function startRun(opt, seed, teamKey) {
+  if (!TEAMS[teamKey]) teamKey = 'BOS';
   const run = {
-    v: 1, seed: seed | 0, rs: hashSeed(seed, 7), arch: opt.key, stage: 0, wins: 0, losses: 0, gold: 3,
+    v: 2, seed: seed | 0, rs: hashSeed(seed, 7), arch: opt.key, team: teamKey, schedule: null, stage: 0, wins: 0, losses: 0, gold: 3,
     lineup: opt.team.lineup, pitchers: opt.team.pitchers, relics: [opt.relic],
     phase: 'club', shop: null, rewards: null, rerolls: 0, done: false, champion: false, history: [], G: null,
     stats: { hr: 0, runs: 0, steals: 0 },
   };
+  run.schedule = makeSchedule(run, teamKey);
   run.shop = makeShop(run);
   return run;
 }
@@ -148,17 +207,23 @@ function oppFor(run) {
   const h = { rs: hashSeed(run.seed, 100 + st) };
   const boss = st >= 8;
   const S = 44 + st * 2.1 + (boss ? 1 : 0) + (st === 11 ? 2 : 0);
-  const name = st < 8 ? OPP_NAMES[0][st] : OPP_NAMES[1][st - 8];
+  const key = run.schedule[st], T = TEAMS[key];
   const nq = boss ? (st === 11 ? 2 : 1) : (st >= 4 ? 1 : (chance(h, 0.5) ? 1 : 0));
   const quirks = sample(h, Object.keys(QUIRKS), Math.max(nq, st === 11 ? 2 : nq));
+  TAKEN = new Set();
   const lineup = POS.map(() => genBatter(h, S, null, 0));
   const pitchers = [genPitcher(h, S + 3, 'sp', 0), genPitcher(h, S, 'rp', 0), genPitcher(h, S - 2, 'rp', 0)];
-  return { stage: st, label: STAGE_LABELS[st], name, colors: OPP_COLORS[st], S, quirks, lineup, pitchers, boss };
+  TAKEN = null;
+  const T2 = TEAMS[run.team];
+  const where = st < 8 ? (T.div === T2.div && T.lg === T2.lg ? T.lg + ' ' + T.div.toUpperCase() : LEAGUES[T.lg].toUpperCase()) : stageLabel(run, st);
+  return { stage: st, key, label: stageLabel(run, st), where, name: teamName(key), city: T.city, nick: T.nick, abbr: key, colors: T.colors, S, quirks, lineup, pitchers, boss };
 }
 
 function makeTraining(h, n) { return sample(h, Object.keys(TRAINING), n); }
+function rosterNames(run) { return new Set(run.lineup.concat(run.pitchers).map(p => p.name)); }
 function makeShop(run) {
   const h = run;
+  TAKEN = rosterNames(run);
   const q = stageQuality(run.stage);
   const owned = new Set(run.relics);
   const relicPool = Object.keys(RELICS).filter(k => !owned.has(k));
@@ -168,10 +233,12 @@ function makeShop(run) {
   const p2 = chance(h, 0.5) ? genBatter(h, q + 3, null, 0.4) : genPitcher(h, q + 3, chance(h, 0.45) ? 'sp' : 'rp', 0.5);
   items.push({ t: p2.kind === 'bat' ? 'bat' : 'pit', p: p2, price: playerPrice(p2) });
   makeTraining(h, 2).forEach(id => items.push({ t: 'train', id, price: 3 }));
+  TAKEN = null;
   return items;
 }
 function makeRewards(run) {
   const h = run;
+  TAKEN = rosterNames(run);
   const q = stageQuality(run.stage) + 6;
   const owned = new Set(run.relics);
   const pool = Object.keys(RELICS).filter(k => !owned.has(k));
@@ -181,6 +248,7 @@ function makeRewards(run) {
   const pp = genPitcher(h, q, chance(h, 0.4) ? 'sp' : 'rp', 0.6);
   const mix = [{ t: 'pit', p: pp }, { t: 'train', id: pick(h, Object.keys(TRAINING)), free: true }, { t: 'gold', amt: 6 }];
   out.push(pick(h, mix));
+  TAKEN = null;
   return out.slice(0, 3);
 }
 function rerollShop(run) {
@@ -216,7 +284,8 @@ function newGame(run) {
   const opp = oppFor(run);
   const G = {
     rs: hashSeed(run.seed, 5000 + run.stage * 17 + run.wins * 3 + run.losses),
-    stage: run.stage, oppName: opp.name, oppColors: opp.colors, oppLabel: opp.label, boss: opp.boss,
+    stage: run.stage, oppName: opp.name, oppNick: opp.nick, oppAbbr: opp.abbr, oppColors: opp.colors, oppLabel: opp.label, boss: opp.boss,
+    usAbbr: run.team, usColors: TEAMS[run.team].colors,
     inn: 1, half: 'top', outs: 0, bases: [null, null, null], score: { us: 0, opp: 0 }, line: { us: [], opp: [0] },
     len: GAME_LEN, over: false, winner: null, walkoff: false,
     clutch: 3 + (run.relics.includes('seeds') ? 2 : 0), used: {},
@@ -440,7 +509,7 @@ function oppAI(G) {
     const gas = gasOf(G, 'opp', p);
     if (gas <= 0 || (p.kind === 'sp' && G.inn >= 5 && gas <= 3)) {
       t.pi++;
-      return { type: 'pull', text: G.oppName + ' bring in ' + t.pitchers[t.pi].name + '.', again: true, side: 'us', runs: 0, outs: 0, score: { us: G.score.us, opp: G.score.opp }, basesNow: G.bases.slice(), outsNow: G.outs };
+      return { type: 'pull', text: 'The ' + (G.oppNick || G.oppName) + ' bring in ' + t.pitchers[t.pi].name + '.', again: true, side: 'us', runs: 0, outs: 0, score: { us: G.score.us, opp: G.score.opp }, basesNow: G.bases.slice(), outsNow: G.outs };
     }
   }
   return null;
@@ -682,6 +751,7 @@ function finishGame(run, G) {
 }
 
 const api = {
+  TEAMS, LEAGUES, teamName, stageLabel,
   RELICS, QUIRKS, TRAINING, ARCH, BAT_TRAITS, PIT_TRAITS, APPR_BAT, APPR_PIT, POS, STAGE_LABELS, TOTAL_STAGES, MAX_LOSSES, GAME_LEN,
   newDraft, startRun, oppFor, makeShop, makeRewards, rerollShop, placePlayer, applyTraining, addRelic, playerAt, finishGame,
   newGame, nextPA, resolve, preview, stealProb, buntProb, curPitcher, gasOf, ovr, playerPrice,

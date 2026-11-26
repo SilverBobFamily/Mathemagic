@@ -111,3 +111,31 @@ h3{font-size:9px;color:var(--cyan)}
 .nice{animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){#banner.show{animation-duration:.01s}.shake{animation:none}.nice{animation:none}}
+
+/* team picker */
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.team{font:inherit;font-size:8px;color:var(--paper);background:var(--panel);border:3px solid var(--line);padding:7px;display:flex;align-items:center;gap:7px;text-align:left;cursor:pointer;min-height:48px;min-width:0;touch-action:manipulation;box-shadow:0 3px 0 #000}
+.team:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
+.team.last{border-color:var(--yellow)}
+.team .sw{width:20px;height:20px;border:4px solid;flex:none;display:block}
+.team .tn{line-height:1.6;min-width:0;overflow:hidden}
+.team .tn .dim{font-size:7px}
+
+/* onboarding */
+.intro{justify-content:flex-start;padding-top:calc(env(safe-area-inset-top) + 10px)}
+.coachpt{width:96px;height:96px;margin-top:10px}
+.introtext{line-height:1.9;max-width:34ch;font-size:9px}
+.introart{min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}
+.pips{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.pips i{display:block;width:14px;height:14px;background:var(--green);border:2px solid var(--paper)}
+.pips i.po{background:var(--yellow)}
+.dots{display:flex;gap:6px}.dots i{display:block;width:8px;height:8px;background:var(--line)}.dots i.on{background:var(--yellow)}
+.coach-ov{position:absolute;inset:0;z-index:20;background:rgba(10,12,24,.62)}
+.coach{position:absolute;left:10px;right:10px;background:var(--ink);border:3px solid var(--yellow);box-shadow:0 5px 0 #000;padding:10px}
+.coach.at-top{top:calc(env(safe-area-inset-top) + 12px)}
+.coach.at-bottom{bottom:calc(env(safe-area-inset-bottom) + 12px)}
+.coach .ct{font-size:8px;line-height:1.8}
+.spot{position:relative;z-index:25;outline:3px solid var(--yellow);outline-offset:3px;animation:spotpulse 1s steps(2) infinite}
+.sticky.spot{position:sticky}
+@keyframes spotpulse{50%{outline-color:var(--paper)}}
+@media (prefers-reduced-motion:reduce){.spot{animation:none}}
