@@ -923,7 +923,7 @@ function screenEnd() {
 /* ---------- boot ---------- */
 window.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('gesturestart', e => e.preventDefault());
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.__NO_SW) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.__NO_SW) { navigator.serviceWorker.register('/baseball/sw.js', { scope: '/baseball/' }).catch(() => {}); }
 const saved = store.get('pinetar.run', null);
 if (saved && saved.G) { run = saved; screenTitle(); } else screenTitle();
 window.__pt = { E, get run() { return run; }, screenTitle };
