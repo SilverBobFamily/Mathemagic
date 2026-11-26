@@ -12,15 +12,53 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 let settings = Object.assign({ mode: 'key', sound: true, fast: false }, store.get('pinetar.set', {}));
-let meta = Object.assign({ runs: 0, best: 0, titles: 0, bestWins: 0, onboarded: false, tips: {}, tipsOff: false, lastTeam: null }, store.get('pinetar.meta', {}));
+let meta = Object.assign({ runs: 0, best: 0, titles: 0, bestWins: 0, onboarded: false, tips: {}, tipsOff: false, lastTeam: null, hof: {}, pressure: 0, daily: {}, gauntletBest: 0 }, store.get('pinetar.meta', {}));
 const saveMeta = () => store.set('pinetar.meta', meta);
 let pendingTeam = null;
 /* drop saves from before the MLB-cities update */
-(function () { const r = store.get('pinetar.run', null); if (r && r.v !== 2) store.del('pinetar.run'); })();
+(function () { const r = store.get('pinetar.run', null); if (r && !(r.v >= 2)) store.del('pinetar.run'); })();
 let run = null;
 let draft = null;
 const saveSettings = () => store.set('pinetar.set', settings);
-const saveRun = () => { if (run) store.set('pinetar.run', run); };
+/* ---------- autosave ----------
+   Every at-bat, every purchase and every screen change writes to this device. The last 3 between-game
+   snapshots are kept as backups, and the app asks the browser not to evict its storage. */
+let lastFlash = 0;
+function flashSaved() {
+  const now = Date.now(); if (now - lastFlash < 1500) return; lastFlash = now;
+  let el = document.getElementById('saved');
+  if (!el) { el = document.createElement('div'); el.id = 'saved'; el.textContent = 'SAVED'; document.body.appendChild(el); }
+  el.classList.add('on'); clearTimeout(flashSaved.t); flashSaved.t = setTimeout(() => el.classList.remove('on'), 900);
+}
+function saveRun(quiet) {
+  if (!run) return;
+  run.savedAt = Date.now();
+  try { localStorage.setItem('pinetar.run', JSON.stringify(run)); if (!quiet) flashSaved(); } catch (e) {}
+}
+function runLabel(r) {
+  const T = E.TEAMS[r.team] || { nick: '?' };
+  const m = r.mode === 'gauntlet' ? 'GAUNTLET' : r.mode === 'daily' ? 'DAILY' : (r.pressure ? 'P' + r.pressure + ' SEASON' : 'SEASON');
+  const where = r.done ? 'FINAL' : r.mode === 'gauntlet' ? 'GAME ' + (r.stage + 1) : E.stageLabel(r, Math.min(r.stage, 11));
+  return `${T.nick} &middot; ${m} &middot; ${where} &middot; ${r.wins}-${r.losses}`;
+}
+function backupRun() {
+  if (!run || run.done) return;
+  const ring = store.get('pinetar.bak', []).filter(b => b.run && b.run.seed !== run.seed || (b.run && b.run.stage !== run.stage));
+  ring.unshift({ at: Date.now(), run: JSON.parse(JSON.stringify(run)) });
+  store.set('pinetar.bak', ring.slice(0, 3));
+}
+function ago(t) {
+  if (!t) return '';
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveRun(true); });
+window.addEventListener('pagehide', () => saveRun(true));
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+function collect(p) { if (p && p.name && !meta.hof[p.name]) { meta.hof[p.name] = p.tier || 'C'; saveMeta(); } }
+function collectRoster() { if (!run) return; run.lineup.concat(run.pitchers).forEach(collect); }
+let pendingMode = { mode: 'season', pressure: 0 };
+const todayKey = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 /* ---------- audio ---------- */
 let ac = null;
@@ -131,6 +169,11 @@ const Field = (() => {
     const shirt = team[0], cap = team[1];
     x = Math.round(x); y = Math.round(y);
     px('#000', x - 3, y, 7, 1); // shadow
+    // 1px dark outline so players read against grass and dirt
+    ctx.fillStyle = '#10121c';
+    ctx.fillRect(x - 3, y - 12, 7, 12); ctx.fillRect(x - 2, y - 13, 5, 1);
+    if (pose === 'bat') ctx.fillRect(x + 2, y - 13, 4, 7);
+    if (pose === 'swing') ctx.fillRect(x - 10, y - 8, 8, 3);
     px(cap, x - 2, y - 11, 5, 2); px(cap, flip ? x - 3 : x + 1, y - 10, 2, 1);
     px(skin, x - 1, y - 9, 3, 2);
     px(shirt, x - 2, y - 7, 5, 3);
@@ -272,13 +315,15 @@ function traitChip(p) {
   const t = (E.BAT_TRAITS[p.trait] || E.PIT_TRAITS[p.trait]);
   return `<span class="chip t" title="${t.desc}">${t.name}</span>`;
 }
-function traitDesc(p) { if (!p.trait) return ''; const t = (E.BAT_TRAITS[p.trait] || E.PIT_TRAITS[p.trait]); return `<div class="dim" style="font-size:7px;line-height:1.5">${t.name}: ${t.desc}</div>`; }
+function traitDesc(p) { if (!p.trait) return ''; const t = (E.BAT_TRAITS[p.trait] || E.PIT_TRAITS[p.trait]); return `<div class="dim" style="font-size:18px;line-height:1.5">${t.name}: ${t.desc}</div>`; }
+const tierOf = p => p.tier || 'C';
+const tierBadge = p => `<span class="tb tier-${tierOf(p)}" title="${E.TIERS[tierOf(p)].name}">${tierOf(p)}</span>`;
 function playerRow(p, pos, extra) {
-  return `<div class="pl ${extra && extra.cls || ''}" ${extra && extra.attr || ''}><span class="pos">${pos || (p.kind === 'bat' ? '' : p.kind.toUpperCase())}</span><img class="pt" src="${portrait(p)}" alt=""><div class="info"><div class="nm">${p.name} ${traitChip(p)}</div>${statsHTML(p)}</div><span class="y">${E.ovr(p)}</span></div>`;
+  return `<div class="pl tier-${tierOf(p)} ${extra && extra.cls || ''}" ${extra && extra.attr || ''}><span class="pos">${pos || (p.kind === 'bat' ? '' : p.kind.toUpperCase())}</span><img class="pt" src="${portrait(p)}" alt=""><div class="info"><div class="nm">${tierBadge(p)}${p.name}</div>${statsHTML(p)}${traitChip(p)}</div><span class="ov">${E.ovr(p)}</span></div>`;
 }
 function strikesHTML() {
   let h = '<div class="strikes">';
-  for (let i = 0; i < E.MAX_LOSSES; i++) h += `<i class="${i < run.losses ? 'x' : ''}"></i>`;
+  for (let i = 0; i < E.maxLosses(run); i++) h += `<i class="${i < run.losses ? 'x' : ''}"></i>`;
   return h + '</div>';
 }
 function modal(html, onMount) {
@@ -290,20 +335,23 @@ const closeModal = m => { if (m && m.parentNode) m.parentNode.removeChild(m); };
 
 /* ---------- title ---------- */
 function screenTitle() {
-  const has = !!store.get('pinetar.run', null);
+  const sv = store.get('pinetar.run', null);
+  const has = !!sv;
   mount(`<div class="screen title">
     <img class="ballbig" src="${ballIcon()}" alt="">
     <h1 class="logo">PINE<br>TAR</h1>
     <p class="tag">A BASEBALL ROGUELITE</p>
     <div class="row" style="flex-direction:column;gap:12px;width:100%;align-items:center">
-      ${has ? '<button class="btn go" id="b-cont">CONTINUE RUN</button>' : ''}
+      ${has ? `<button class="btn go" id="b-cont">CONTINUE<small>${runLabel(sv)}</small><small>autosaved ${ago(sv.savedAt)}</small></button>` : ''}
       <button class="btn ${has ? '' : 'go'}" id="b-new">${meta.onboarded ? 'NEW RUN' : 'PLAY BALL'}</button>
+      <button class="btn" id="b-hof">HALL OF FAME</button>
       <button class="btn" id="b-help">HOW TO PLAY</button>
       <button class="btn" id="b-set">SETTINGS</button>
     </div>
-    <p class="dim" style="font-size:7px;line-height:1.8">RUNS ${meta.runs} &nbsp; BEST GAME ${meta.best} / 12 &nbsp; TITLES ${meta.titles}</p>
+    <p class="dim" style="font-size:19px;line-height:1.5">Runs ${meta.runs} &middot; Titles ${meta.titles}<br>Pressure ${meta.pressure}/8 &middot; Gauntlet best ${meta.gauntletBest}</p>
   </div>`);
-  $('#b-new').onclick = () => { snd('click'); if (has && !confirmNew) { confirmNew = true; $('#b-new').textContent = 'TAP AGAIN: ERASE RUN'; $('#b-new').classList.add('warn'); return; } confirmNew = false; store.del('pinetar.run'); run = null; if (!meta.onboarded) screenIntro(0); else screenTeams(); };
+  $('#b-new').onclick = () => { snd('click'); if (has && !confirmNew) { confirmNew = true; $('#b-new').textContent = 'TAP AGAIN: ERASE RUN'; $('#b-new').classList.add('warn'); return; } confirmNew = false; store.del('pinetar.run'); run = null; if (!meta.onboarded) screenIntro(0); else screenModes(); };
+  $('#b-hof').onclick = () => { snd('click'); screenHof(); };
   if (has) $('#b-cont').onclick = () => { snd('click'); run = store.get('pinetar.run', null); if (!run) return screenTitle(); resume(); };
   $('#b-help').onclick = () => { snd('click'); showHelp(); };
   $('#b-set').onclick = () => { snd('click'); showSettings(); };
@@ -312,11 +360,14 @@ let confirmNew = false;
 
 function showHelp() {
   modal(`<h2>HOW TO PLAY</h2><div class="help">
-  <p>Win 12 games to take the title. Lose ${E.MAX_LOSSES} and the run ends.</p>
+  <p><span class="y">MODES:</span> SEASON is 12 games ending in the World Series. Win one to unlock the next PRESSURE level (8 total). DAILY GAME is the same city, roster and twists for everyone, once a day. GAUNTLET is endless.</p>
+  <p>Lose ${E.MAX_LOSSES} games and the run ends.</p>
   <p><span class="y">GAMES</span> are 6 innings. The sim runs itself. When runners are on, it stops and YOU call the play.</p>
   <p><span class="y">AT BAT:</span> pick an approach (contact, power, patient), steal, or bunt. <span class="y">PITCHING:</span> attack, nibble, walk a guy, or change pitchers before your arm tires.</p>
   <p><span class="y">CLUTCH</span> charges (3 a game) boost one at-bat or pitch. The numbers on each button are your odds.</p>
-  <p><span class="y">BETWEEN GAMES:</span> spend gold on relics, free agents and training. Win a game to pick a free reward.</p>
+  <p><span class="y">BETWEEN GAMES:</span> spend gold on relics, free agents and training. Win a game to pick a free reward. Sometimes something weird happens in the clubhouse. Choose wisely.</p>
+  <p><span class="y">RARITY:</span> players come <span style="color:var(--tC)">COMMON</span>, <span style="color:var(--tU)">UNCOMMON</span>, <span style="color:var(--tR)">RARE</span> and <span style="color:var(--tL)">LEGENDARY</span>. Better players are rarer. Every player you sign goes in your Hall of Fame.</p>
+  <p class="dim">The game saves itself on this device after every at-bat.</p>
   <p class="dim">CON contact, POW power, EYE walks, SPD legs, DEF glove. STF stuff, CTL control, STA stamina.</p>
   </div><button class="btn go" id="x">GOT IT</button>`, m => { $('#x', m).onclick = () => { snd('click'); closeModal(m); }; });
 }
@@ -328,19 +379,26 @@ function showSettings(inGame) {
     ${modes.map(([k, n, d]) => `<button class="btn ${settings.mode === k ? 'on' : ''}" data-m="${k}">${n}<small>${d}</small></button>`).join('')}
     <div class="grid2"><button class="btn ${settings.fast ? 'on' : ''}" id="fast">SPEED: ${settings.fast ? 'FAST' : 'NORMAL'}</button><button class="btn ${settings.sound ? 'on' : ''}" id="snd">SOUND: ${settings.sound ? 'ON' : 'OFF'}</button></div>
     <button class="btn ${meta.tipsOff ? '' : 'on'}" id="tips">COACH TIPS: ${meta.tipsOff ? 'OFF' : 'ON'}</button>
-    ${inGame ? '<button class="btn warn" id="quit">SAVE AND QUIT TO TITLE</button>' : '<button class="btn" id="replay">REPLAY TUTORIAL</button>'}
+    ${inGame ? '<button class="btn warn" id="quit">SAVE AND QUIT TO TITLE</button>' : '<button class="btn" id="replay">REPLAY TUTORIAL</button><button class="btn" id="restore">RESTORE A BACKUP<small>Last 3 between-game autosaves</small></button>'}
     <button class="btn go" id="x">CLOSE</button>`;
     $$('[data-m]', m).forEach(b => b.onclick = () => { settings.mode = b.dataset.m; saveSettings(); snd('click'); render(m); });
     $('#fast', m).onclick = () => { settings.fast = !settings.fast; saveSettings(); snd('click'); render(m); };
     $('#snd', m).onclick = () => { settings.sound = !settings.sound; saveSettings(); snd('click'); render(m); };
     $('#x', m).onclick = () => { snd('click'); closeModal(m); };
     $('#tips', m).onclick = () => { meta.tipsOff = !meta.tipsOff; saveMeta(); snd('click'); render(m); };
+    if (!inGame) $('#restore', m).onclick = () => { snd('click'); closeModal(m); showBackups(); };
     if (!inGame) $('#replay', m).onclick = () => { meta.tips = {}; meta.tipsOff = false; meta.onboarded = false; saveMeta(); snd('click'); closeModal(m); screenTitle(); };
     if (inGame) $('#quit', m).onclick = () => { quitGame = true; closeModal(m); location.reload(); };
   };
   const m = modal('', null); render(m);
 }
 let quitGame = false;
+function showBackups() {
+  const ring = store.get('pinetar.bak', []);
+  const m = modal(`<h2>BACKUPS</h2><p class="dim">Restoring replaces your current run.</p>${ring.length ? ring.map((b, i) => `<button class="btn" data-b="${i}">${runLabel(b.run)}<small>saved ${ago(b.at)}</small></button>`).join('') : '<p>No backups yet. One is made before every game.</p>'}<button class="btn go" id="x">CLOSE</button>`);
+  $$('[data-b]', m).forEach(b => b.onclick = () => { run = ring[+b.dataset.b].run; run.G = null; saveRun(); closeModal(m); snd('buy'); resume(); });
+  $('#x', m).onclick = () => { snd('click'); closeModal(m); };
+}
 
 /* ---------- onboarding ---------- */
 const COACH = { look: 424242, kind: 'bat' };
@@ -355,7 +413,7 @@ function introArt(kind) {
   if (kind === 'field') return `<img class="ballbig" src="${ballIcon()}" alt="">`;
   if (kind === 'season') {
     const pips = []; for (let i = 0; i < 12; i++) pips.push(`<i class="${i >= 8 ? 'po' : ''}"></i>`);
-    return `<div class="pips">${pips.join('')}</div><div class="dim" style="font-size:7px;margin-top:6px">8 GAMES &middot; 4 PLAYOFF ROUNDS</div>`;
+    return `<div class="pips">${pips.join('')}</div><div class="dim" style="font-size:18px;margin-top:6px">8 GAMES &middot; 4 PLAYOFF ROUNDS</div>`;
   }
   if (kind === 'odds') return `<div class="grid2" style="width:100%"><div class="btn">POWER<small class="odds">K28 BB8<br>H18 HR5</small></div><div class="btn">STEAL 74%<small>to 2nd</small></div></div>`;
   return `<div><span class="chip">Pine Tar</span><span class="chip">Rally Cap</span><span class="chip">Corked Bat</span><span class="chip t">Clutch</span></div>`;
@@ -369,10 +427,10 @@ function screenIntro(i) {
     <p class="introtext">${sl.t}</p>
     <div class="introart">${introArt(sl.art)}</div>
     <div class="dots">${INTRO.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>
-    <button class="btn go" id="next" style="width:230px">${i < INTRO.length - 1 ? 'NEXT' : 'PICK YOUR CITY'}</button>
+    <button class="btn go" id="next" style="width:230px">${i < INTRO.length - 1 ? 'NEXT' : 'LET\'S GO'}</button>
   </div>`);
-  $('#next').onclick = () => { snd('click'); if (i < INTRO.length - 1) screenIntro(i + 1); else { meta.onboarded = true; saveMeta(); screenTeams(); } };
-  $('#skip').onclick = () => { snd('click'); meta.onboarded = true; saveMeta(); screenTeams(); };
+  $('#next').onclick = () => { snd('click'); if (i < INTRO.length - 1) screenIntro(i + 1); else { meta.onboarded = true; saveMeta(); screenModes(); } };
+  $('#skip').onclick = () => { snd('click'); meta.onboarded = true; saveMeta(); screenModes(); };
 }
 function screenTeams() {
   const groups = [];
@@ -383,7 +441,7 @@ function screenTeams() {
     ${groups.map(g => `<h3 style="margin-top:4px">${g.lg} ${g.div.toUpperCase()}</h3><div class="teams">${g.keys.map(k => { const T = E.TEAMS[k]; return `<button class="team ${meta.lastTeam === k ? 'last' : ''}" data-t="${k}"><span class="sw" style="background:${T.colors[0]};border-color:${T.colors[1]}"></span><span class="tn"><span class="dim">${T.city}</span><br>${T.nick}</span></button>`; }).join('')}</div>`).join('')}
   </div>`);
   $$('[data-t]').forEach(b => b.onclick = () => { snd('buy'); pendingTeam = b.dataset.t; meta.lastTeam = pendingTeam; saveMeta(); newDraft(); });
-  $('#back').onclick = () => { snd('click'); screenTitle(); };
+  $('#back').onclick = () => { snd('click'); screenModes(); };
   tips([['teams', 'Pick any club. Your city sets your schedule: division rivals first, then the rest of your league, then the playoffs.', '.teams']]);
 }
 
@@ -404,7 +462,7 @@ function tip(id, html, sel) {
     const r = spot ? spot.getBoundingClientRect() : null;
     const low = r && (r.top + r.height / 2) < window.innerHeight * 0.5;
     const ov = document.createElement('div'); ov.className = 'coach-ov';
-    ov.innerHTML = `<div class="coach ${low ? 'at-bottom' : 'at-top'}"><div class="row" style="align-items:flex-start"><img class="pt" src="${coachImg()}" alt=""><div class="sp"><div class="y" style="font-size:8px;margin-bottom:4px">COACH SPARKY</div><div class="ct">${html}</div></div></div><div class="row" style="margin-top:8px"><button class="btn sm" id="tip-off">SKIP ALL TIPS</button><span class="sp"></span><button class="btn sm go" id="tip-ok">GOT IT</button></div></div>`;
+    ov.innerHTML = `<div class="coach ${low ? 'at-bottom' : 'at-top'}"><div class="row" style="align-items:flex-start"><img class="pt" src="${coachImg()}" alt=""><div class="sp"><div class="who">COACH SPARKY</div><div class="ct">${html}</div></div></div><div class="row" style="margin-top:8px"><button class="btn sm" id="tip-off">SKIP ALL TIPS</button><span class="sp"></span><button class="btn sm go" id="tip-ok">GOT IT</button></div></div>`;
     app.appendChild(ov);
     const done = off => { meta.tips[id] = 1; if (off) meta.tipsOff = true; saveMeta(); if (spot) spot.classList.remove('spot'); closeModal(ov); snd('click'); res(); };
     $('#tip-ok', ov).onclick = () => done(false);
@@ -412,10 +470,94 @@ function tip(id, html, sel) {
   });
 }
 
+/* ---------- modes ---------- */
+let pressSel = null;
+function screenModes() {
+  if (pressSel == null) pressSel = meta.pressure;
+  const today = todayKey(), di = E.dailyInfo(today), dd = meta.daily[today];
+  const gUnlocked = meta.best >= 9 || meta.titles > 0;
+  const P = E.PRESSURE;
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">CHOOSE A MODE</h2><button class="btn sm" id="back">BACK</button></div>
+    <div class="px hl mode" id="m-season">
+      <h2>${E.MODES.season.name}</h2><div class="d">${E.MODES.season.desc}</div>
+      <h3>PRESSURE</h3>
+      <div class="press">${P.map((_, i) => `<button data-p="${i}" class="${i === pressSel ? 'on' : ''}" ${i > meta.pressure ? 'disabled' : ''}>${i}</button>`).join('')}</div>
+      <div class="d"><span class="y">${P[pressSel].name}:</span> ${pressSel ? P.slice(1, pressSel + 1).map(x => x.desc).join(' ') : P[0].desc}${meta.pressure < 8 ? ` <span class="dim">Win at Pressure ${meta.pressure} to unlock ${meta.pressure + 1}.</span>` : ''}</div>
+      <button class="btn go" id="go-season">START SEASON</button>
+    </div>
+    <div class="px mode" id="m-daily">
+      <h2>${E.MODES.daily.name}</h2><div class="d">${E.MODES.daily.desc}</div>
+      <div class="d">Today: <span class="y">${E.teamName(di.team)}</span></div>
+      <div>${di.dmods.map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('')}</div>
+      <div class="d">${di.dmods.map(k => E.DAILY_MODS[k].desc).join(' ')}</div>
+      ${dd ? `<div class="d g">${dd.done ? `Today's result: ${dd.wins}-${dd.losses}${dd.champ ? ', CHAMPIONS' : ''}. Back tomorrow.` : 'Started. Finish it from CONTINUE on the title screen.'}</div>` : ''}
+      <button class="btn ${dd ? '' : 'go'}" id="go-daily" ${dd ? 'disabled' : ''}>PLAY TODAY</button>
+    </div>
+    <div class="px mode ${gUnlocked ? '' : 'locked'}" id="m-gauntlet">
+      <h2>${E.MODES.gauntlet.name}</h2><div class="d">${E.MODES.gauntlet.desc}</div>
+      <div class="d">${gUnlocked ? 'Best: <span class="y">' + meta.gauntletBest + ' wins</span>' : 'Locked. Reach the playoffs in a Season to unlock.'}</div>
+      <button class="btn ${gUnlocked ? 'go' : ''}" id="go-gauntlet" ${gUnlocked ? '' : 'disabled'}>START GAUNTLET</button>
+    </div>
+  </div>`);
+  $('#back').onclick = () => { snd('click'); screenTitle(); };
+  $$('[data-p]').forEach(b => b.onclick = () => { pressSel = +b.dataset.p; snd('click'); const y = $('.screen').scrollTop; screenModes(); $('.screen').scrollTop = y; });
+  $('#go-season').onclick = () => { snd('click'); pendingMode = { mode: 'season', pressure: pressSel }; screenTeams(); };
+  $('#go-daily').onclick = () => {
+    snd('click'); pendingMode = { mode: 'daily', dmods: di.dmods, dateKey: today, seed: di.seed };
+    pendingTeam = di.team; newDraft();
+  };
+  $('#go-gauntlet').onclick = () => { snd('click'); pendingMode = { mode: 'gauntlet' }; screenTeams(); };
+  tips([['modes', 'Start with a <span class="y">SEASON</span>. Win one and you unlock <span class="y">PRESSURE</span> levels, each one harder. The <span class="y">DAILY GAME</span> is a fresh challenge every day.', '#m-season']]);
+}
+
+/* ---------- clubhouse events ---------- */
+function screenEvent() {
+  const ev = E.EVENTS[run.event.id], ch = E.eventChoices(run);
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">MEANWHILE...</h2>${strikesHTML()}<span class="gold">$${run.gold}</span></div>
+    <div class="px event">
+      <div class="row" style="align-items:flex-start;margin-bottom:8px"><img class="pt" src="${coachImg()}" alt=""><h2 class="sp">${ev.title}</h2></div>
+      <p class="story">${ev.text}</p>
+    </div>
+    <div id="choices" style="display:flex;flex-direction:column;gap:10px">${ch.map((c, i) => `<button class="btn ${i === 0 ? 'go' : ''}" data-c="${i}" ${c.ok ? '' : 'disabled'}>${c.label}<small>${c.desc}${c.ok ? '' : ' (not enough gold)'}</small></button>`).join('')}</div>
+  </div>`);
+  $$('[data-c]').forEach(b => b.onclick = async () => {
+    snd('click');
+    const res = E.resolveEvent(run, +b.dataset.c); if (!res) return;
+    let extra = '';
+    if (res.give) { const ok = await placeItem(res.give); if (!ok) extra = ' You let it go.'; }
+    collectRoster(); saveRun();
+    $('#choices').innerHTML = `<div class="px"><p class="result">${res.text}${extra}</p></div><button class="btn go" id="ok">BACK TO THE CLUBHOUSE</button>`;
+    $('#ok').onclick = () => { snd('click'); screenClub(); };
+  });
+  tips([['event', 'Between games, weird stuff happens. Every choice has a tradeoff. Some cost gold. Some are free and still cost you.', '.event']]);
+}
+
+/* ---------- hall of fame ---------- */
+function screenHof() {
+  const all = E.allPlayers();
+  const tiers = ['L', 'R', 'U', 'C'];
+  const got = meta.hof;
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">HALL OF FAME</h2><button class="btn sm" id="back">BACK</button></div>
+    <p class="dim">Every player who ever suited up for you. ${Object.keys(got).length} of ${all.length} collected.</p>
+    ${tiers.map(t => {
+      const list = all.filter(p => p.tier === t), have = list.filter(p => got[p.name]);
+      return `<div class="px tier-${t}" style="border-color:var(--tc)">
+        <div class="row"><h2 class="sp" style="color:var(--tc)">${E.TIERS[t].name}</h2><span class="gold" style="color:var(--tc)">${have.length}/${list.length}</span></div>
+        <div class="bar" style="margin:8px 0"><i style="width:${Math.round(100 * have.length / list.length)}%"></i></div>
+        <div class="hof">${have.length ? have.map(p => `<span>${p.name}</span>`).join('') : '<span class="dim" style="border:0;background:none">Nobody yet.</span>'}</div>
+      </div>`;
+    }).join('')}
+  </div>`);
+  $('#back').onclick = () => { snd('click'); screenTitle(); };
+}
+
 /* ---------- draft ---------- */
 function newDraft() {
   if (!pendingTeam) pendingTeam = meta.lastTeam || 'BOS';
-  draft = E.newDraft((Math.random() * 2 ** 31) | 0);
+  draft = E.newDraft(pendingMode.mode === 'daily' ? pendingMode.seed : (Math.random() * 2 ** 31) | 0);
   screenDraft();
 }
 function avg(arr, k) { return Math.round(arr.reduce((a, p) => a + p[k], 0) / arr.length); }
@@ -427,15 +569,21 @@ function screenDraft() {
       const t = o.team; const best = t.lineup.slice().sort((a, b) => E.ovr(b) - E.ovr(a)).slice(0, 3);
       return `<div class="px"><div class="row"><h2 class="sp">${o.name}</h2><span class="chip">${E.RELICS[o.relic].name}</span></div>
       <p class="dim" style="margin:6px 0">${o.desc}</p>
-      <div class="stats" style="font-size:8px;margin-bottom:6px"><span>CON <b>${avg(t.lineup, 'con')}</b></span><span>POW <b>${avg(t.lineup, 'pow')}</b></span><span>EYE <b>${avg(t.lineup, 'eye')}</b></span><span>SPD <b>${avg(t.lineup, 'spd')}</b></span><span>DEF <b>${avg(t.lineup, 'def')}</b></span><span>SP <b>${t.pitchers[0].stf}</b></span></div>
+      <div class="stats" style="font-size:19px;margin-bottom:6px"><span>CON <b>${avg(t.lineup, 'con')}</b></span><span>POW <b>${avg(t.lineup, 'pow')}</b></span><span>EYE <b>${avg(t.lineup, 'eye')}</b></span><span>SPD <b>${avg(t.lineup, 'spd')}</b></span><span>DEF <b>${avg(t.lineup, 'def')}</b></span><span>SP <b>${t.pitchers[0].stf}</b></span></div>
       <div style="display:flex;flex-direction:column;gap:5px">${best.map(p => playerRow(p, E.POS[t.lineup.indexOf(p)])).join('')}</div>
       <button class="btn go" style="width:100%;margin-top:10px" data-pick="${i}">DRAFT THIS ROSTER</button></div>`;
     }).join('')}
     <button class="btn" id="again">SHOW ME THREE MORE</button>
   </div>`);
-  $$('[data-pick]').forEach(b => b.onclick = () => { snd('buy'); run = E.startRun(draft[+b.dataset.pick], (Math.random() * 2 ** 31) | 0, pendingTeam); saveRun(); screenClub(); });
-  $('#again').onclick = () => { snd('click'); newDraft(); };
-  $('#back').onclick = () => { snd('click'); screenTeams(); };
+  $$('[data-pick]').forEach(b => b.onclick = () => {
+    snd('buy');
+    const pm = pendingMode, seed = pm.mode === 'daily' ? pm.seed : (Math.random() * 2 ** 31) | 0;
+    run = E.startRun(draft[+b.dataset.pick], seed, pendingTeam, pm);
+    if (pm.mode === 'daily') { meta.daily[pm.dateKey] = { done: false }; saveMeta(); }
+    collectRoster(); saveRun(); backupRun(); screenClub();
+  });
+  const ag = $('#again'); if (pendingMode.mode === 'daily') ag.remove(); else ag.onclick = () => { snd('click'); newDraft(); };
+  $('#back').onclick = () => { snd('click'); pendingMode.mode === 'daily' ? screenModes() : screenTeams(); };
   tips([['draft', 'Each roster has a style and a starting <span class="y">relic</span>. Relics are permanent team-wide buffs. Don\'t like these three? Reroll for free.', '.px']]);
 }
 
@@ -445,7 +593,11 @@ function teamRating() {
   return { bat: Math.round(run.lineup.reduce((a, p) => a + E.ovr(p), 0) / 9), sp: E.ovr(run.pitchers[0]) };
 }
 function screenClub() {
+  if (run.event) return screenEvent();
+  if (run._bak !== run.stage) { run._bak = run.stage; backupRun(); }
+  saveRun(true);
   const opp = E.oppFor(run);
+  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
   const my = teamRating();
   const theirBat = Math.round(opp.lineup.reduce((a, p) => a + E.ovr(p), 0) / 9), theirSp = E.ovr(opp.pitchers[0]);
   const cmp = (a, b) => `<span class="${a > b ? 'g' : a < b ? 'r' : ''}">${a}</span> <span class="dim">vs</span> ${b}`;
@@ -453,18 +605,19 @@ function screenClub() {
   mount(`<div class="screen">
     <div class="top"><h2 class="sp">${E.TEAMS[run.team].nick.toUpperCase()}</h2>${strikesHTML()}<span class="gold">$${run.gold}</span><button class="btn sm" id="set">MENU</button></div>
     <div class="px hl" id="oppcard">
-      <div class="row"><h3 class="sp">${opp.label}${run.stage < 8 ? ' &middot; ' + opp.where : ''}</h3><span class="dim">${run.wins}W ${run.losses}L</span></div>
-      <div class="row" style="margin:6px 0"><div class="sp"><div class="y" style="font-size:11px">${opp.name}</div></div><span style="width:22px;height:22px;background:${opp.colors[0]};border:3px solid ${opp.colors[1]};display:block"></span></div>
-      <div class="stats" style="font-size:8px;margin-bottom:6px"><span>BATS ${cmp(my.bat, theirBat)}</span><span>ARM ${cmp(my.sp, theirSp)}</span></div>
+      ${modeChips ? `<div>${modeChips}</div>` : ''}
+      <div class="row"><h3 class="sp">${opp.label}${run.stage < 8 || run.mode === 'gauntlet' ? ' &middot; ' + opp.where : ''}</h3><span class="dim">${run.wins}W ${run.losses}L</span></div>
+      <div class="row" style="margin:6px 0"><div class="sp"><div class="y" style="font-size:23px">${opp.name}</div></div><span style="width:22px;height:22px;background:${opp.colors[0]};border:3px solid ${opp.colors[1]};display:block"></span></div>
+      <div class="stats" style="font-size:19px;margin-bottom:6px"><span>BATS ${cmp(my.bat, theirBat)}</span><span>ARM ${cmp(my.sp, theirSp)}</span></div>
       <div>${opp.quirks.map(q => `<span class="chip q">${E.QUIRKS[q].name}</span>`).join('') || '<span class="dim">No special tricks.</span>'}</div>
-      <div class="dim" style="font-size:7px">${opp.quirks.map(q => E.QUIRKS[q].desc).join(' ')}</div>
+      <div class="dim" style="font-size:18px">${opp.quirks.map(q => E.QUIRKS[q].desc).join(' ')}</div>
     </div>
     ${rewards}
     <div class="sec" id="shophead"><h2>SHOP</h2><button class="btn sm" id="reroll">REROLL $${2 + run.rerolls}</button></div>
     <div class="cards">${run.shop.map((r, i) => itemCard(r, i, 'shop', false)).join('')}</div>
     <div class="sec"><h2>RELICS ${run.relics.length}/5</h2></div>
-    <div class="px">${run.relics.map(id => `<div style="margin-bottom:6px"><span class="chip">${E.RELICS[id].name}</span><span class="dim" style="font-size:7px"> ${E.RELICS[id].desc}</span></div>`).join('')}</div>
-    <div class="sec" id="lineuphead"><h2>LINEUP</h2><span class="dim" style="font-size:7px">TAP TWO TO SWAP ORDER</span></div>
+    <div class="px">${run.relics.map(id => `<div style="margin-bottom:6px"><span class="chip">${E.RELICS[id].name}</span><span class="dim" style="font-size:18px"> ${E.RELICS[id].desc}</span></div>`).join('')}</div>
+    <div class="sec" id="lineuphead"><h2>LINEUP</h2><span class="dim" style="font-size:18px">TAP TWO TO SWAP ORDER</span></div>
     <div style="display:flex;flex-direction:column;gap:5px">${run.lineup.map((p, i) => playerRow(p, E.POS[i], { cls: sel === i ? 'sel' : '', attr: `data-ln="${i}"` })).join('')}</div>
     <div class="sec"><h2>PITCHERS</h2></div>
     <div style="display:flex;flex-direction:column;gap:5px">${run.pitchers.map((p, i) => playerRow(p, i === 0 ? 'SP' : 'RP')).join('')}</div>
@@ -496,8 +649,9 @@ function itemCard(it, i, kind, free) {
   if (it.t === 'relic') { const r = E.RELICS[it.id]; body = `<div class="nm y">${r.name}</div><div class="d">${r.desc}</div>`; }
   else if (it.t === 'train') { const t = E.TRAINING[it.id]; body = `<div class="nm c">${t.name}</div><div class="d">${t.desc}</div>`; }
   else if (it.t === 'gold') { body = `<div class="nm y">CASH $${it.amt}</div><div class="d">Pocket the money.</div>`; }
-  else { const p = it.p; body = `<div class="row" style="gap:5px"><img class="pt" src="${portrait(p)}" alt=""><div class="info" style="min-width:0"><div class="nm">${p.name}</div><div class="g" style="font-size:7px">${p.kind === 'bat' ? 'HITTER' : p.kind.toUpperCase()} ${E.ovr(p)}</div></div></div>${statsHTML(p)}${traitChip(p)}`; }
-  return `<div class="card ${free ? 'pick' : ''} ${it.sold ? 'sold' : ''}"><div style="flex:1;display:flex;flex-direction:column;gap:5px">${body}</div><button class="btn sm ${afford ? (free ? 'gold' : '') : ''}" ${afford ? '' : 'disabled'} ${attr}>${free ? 'TAKE IT' : (it.sold ? 'SOLD' : 'BUY ' + price)}</button></div>`;
+  else { const p = it.p; body = `<div class="row" style="gap:6px"><img class="pt" src="${portrait(p)}" alt=""><div class="info" style="min-width:0"><div class="nm">${p.name}</div><div class="kind">${tierBadge(p)}${p.kind === 'bat' ? 'HITTER' : p.kind.toUpperCase()} <span class="y">${E.ovr(p)}</span></div></div></div>${statsHTML(p)}<div>${traitChip(p)}</div>`; }
+  const tcls = it.p ? 'tier-' + tierOf(it.p) : '';
+  return `<div class="card ${tcls} ${free ? 'pick' : ''} ${it.sold ? 'sold' : ''}"><div style="flex:1;display:flex;flex-direction:column;gap:5px">${body}</div><button class="btn sm ${afford ? (free ? 'gold' : '') : ''}" ${afford ? '' : 'disabled'} ${attr}>${free ? 'TAKE IT' : (it.sold ? 'SOLD' : 'BUY ' + price)}</button></div>`;
 }
 async function placeItem(it) {
   // returns true if applied
@@ -509,7 +663,7 @@ async function placeItem(it) {
   if (it.t === 'gold') { run.gold += it.amt; return true; }
   if (it.t === 'bat' || it.t === 'pit') {
     const slot = await chooseSlot({ player: it.p }); if (slot == null) return false;
-    E.placePlayer(run, it.p, slot); return true;
+    E.placePlayer(run, it.p, slot); collect(it.p); return true;
   }
   if (it.t === 'train') {
     const slot = await chooseSlot({ train: it.id }); if (slot == null) return false;
@@ -581,8 +735,8 @@ function updateMatch(G, pa) {
   const gasPct = Math.max(0, Math.min(100, Math.round(100 * pa.gas / gasMax)));
   const bat = pa.batter, pit = pa.pitcher;
   const bs = bat.con !== undefined ? `<div class="stats"><span>C <b>${bat.con}</b></span><span>P <b>${bat.pow}</b></span><span>E <b>${bat.eye}</b></span><span>S <b>${bat.spd}</b></span></div>` : '';
-  $('#m-bat').innerHTML = `<div class="dim" style="font-size:6px">AT BAT</div><div class="nm ${pa.side === 'us' ? 'g' : ''}">${bat.name}</div>${bs}`;
-  $('#m-pit').innerHTML = `<div class="dim" style="font-size:6px">PITCHING</div><div class="nm ${pa.side === 'opp' ? 'g' : ''}">${pit.name}</div><div class="stats"><span>STF <b>${pit.stf}</b></span><span>CTL <b>${pit.ctl}</b></span></div><div class="gas ${pa.gas <= 0 ? 'low' : ''}"><i style="width:${gasPct}%"></i></div>`;
+  $('#m-bat').innerHTML = `<div class="lbl">AT BAT</div><div class="nm ${pa.side === 'us' ? 'g' : ''}">${bat.tier ? tierBadge(bat) : ''}${bat.name}</div>${bs}`;
+  $('#m-pit').innerHTML = `<div class="lbl">PITCHING</div><div class="nm ${pa.side === 'opp' ? 'g' : ''}">${pit.tier ? tierBadge(pit) : ''}${pit.name}</div><div class="stats"><span>STF <b>${pit.stf}</b></span><span>CTL <b>${pit.ctl}</b></span></div><div class="gas ${pa.gas <= 0 ? 'low' : ''}"><i style="width:${gasPct}%"></i></div>`;
 }
 function setLog(t) { const l = $('#log'); if (l) l.textContent = t || ''; }
 function situation(G) {
@@ -609,7 +763,7 @@ function askDecision(G, pa) {
       const nextP = !bat && pa.canPull ? G.t.us.pitchers[G.t.us.pi + 1] : null;
       const tired = !bat && pa.gas <= 0;
       let h = `<div class="panel"><div class="row"><h3 class="sp">${bat ? 'YOU ARE UP: ' + pa.batter.name : 'ON THE MOUND: ' + pa.pitcher.name}</h3>${pa.canClutch ? `<button class="btn sm ${clutch ? 'on' : ''}" id="cl">CLUTCH x${G.clutch}</button>` : '<span class="dim">NO CLUTCH</span>'}</div>
-      <div class="dim" style="font-size:7px">${situation(G)}${tired ? ' <span class="r">ARM IS TIRED!</span>' : ''}</div>
+      <div class="dim" style="font-size:18px">${situation(G)}${tired ? ' <span class="r">ARM IS TIRED!</span>' : ''}</div>
       <div class="${bat ? 'grid4' : 'grid4'}" style="${bat ? '' : 'grid-template-columns:repeat(3,1fr)'}">${keys.map(k => `<button class="btn ${k === 'normal' ? 'go' : ''}" data-a="${k}">${apprs[k].name}<small class="odds">${oddsText(odds[k])}</small></button>`).join('')}</div>`;
       const sp = [];
       if (bat) {
@@ -703,13 +857,21 @@ async function gameOver(G) {
   snd(won ? 'win' : 'lose');
   await sleep(300);
   const info = E.finishGame(run, G);
-  if (run.done) { meta.runs++; meta.best = Math.max(meta.best, Math.min(12, run.stage + (run.champion ? 0 : 1))); if (run.champion) meta.titles++; meta.bestWins = Math.max(meta.bestWins, run.wins); store.set('pinetar.meta', meta); }
+  if (run.done) {
+    meta.runs++; meta.bestWins = Math.max(meta.bestWins, run.wins);
+    if (run.mode === 'season') {
+      meta.best = Math.max(meta.best, Math.min(12, run.stage + (run.champion ? 0 : 1)));
+      if (run.champion) { meta.titles++; if ((run.pressure || 0) >= meta.pressure && meta.pressure < 8) { meta.pressure = (run.pressure || 0) + 1; run.unlocked = meta.pressure; } }
+    } else if (run.mode === 'daily') { meta.daily[run.dateKey] = { done: true, wins: run.wins, losses: run.losses, champ: run.champion }; if (run.champion) meta.titles++; }
+    else if (run.mode === 'gauntlet') { run.newBest = run.wins > meta.gauntletBest; meta.gauntletBest = Math.max(meta.gauntletBest, run.wins); }
+    saveMeta();
+  } else backupRun();
   saveRun();
   if (!won && !run.done) await tips([['loss', 'That\'s a <span class="r">strike</span>. Three losses and you\'re fired. Spend your gold, shore up the weak spots.', '.strikes']]);
   const m = modal(`<div class="center"><div class="big">${won ? (G.walkoff ? 'WALK-OFF!' : 'VICTORY') : 'DEFEAT'}</div></div>
-    <div class="center y" style="font-size:14px">${G.score.us} - ${G.score.opp}</div>
+    <div class="center gold" style="font-size:14px">${G.score.us} - ${G.score.opp}</div>
     <p class="center dim">${won ? 'W' : 'L'} vs ${G.oppName}. +$${info.gold} gold${run.relics.includes('piggy') && won ? ' (piggy bank!)' : ''}.</p>
-    ${!won && !run.done ? `<p class="center r">STRIKE ${run.losses} of ${E.MAX_LOSSES}</p>` : ''}
+    ${!won && !run.done ? `<p class="center r">STRIKE ${run.losses} of ${E.maxLosses(run)}</p>` : ''}
     <button class="btn go" id="x">${run.done ? 'SEE RESULTS' : 'TO THE CLUBHOUSE'}</button>`, m => { $('#x', m).onclick = () => { snd('click'); closeModal(m); run.done ? screenEnd() : screenClub(); }; });
 }
 
@@ -718,19 +880,22 @@ function screenEnd() {
   const champ = run.champion;
   mount(`<div class="screen title">
     <img class="ballbig" src="${ballIcon()}" alt="">
-    <div class="big">${champ ? 'CHAMPIONS!' : 'SEASON OVER'}</div>
-    <p class="${champ ? 'g' : 'r'}" style="line-height:1.8">${champ ? 'The ' + E.teamName(run.team) + ' win the World Series. Absolute ballclub.' : (run.stage < 8 ? 'The ' + E.TEAMS[run.team].nick + ' got you fired in game ' + (run.stage + 1) + '.' : 'The ' + E.TEAMS[run.team].nick + ' are out in the ' + E.stageLabel(run, Math.min(run.stage, 11)) + '.')}</p>
-    <div class="px" style="width:100%;text-align:left;line-height:2">
+    <div class="big">${run.mode === 'gauntlet' ? 'GAUNTLET OVER' : champ ? 'CHAMPIONS!' : 'SEASON OVER'}</div>
+    <p class="${champ || run.newBest ? 'g' : 'r'}" style="font-size:23px;line-height:1.4">${run.mode === 'gauntlet' ? 'The ' + E.TEAMS[run.team].nick + ' won ' + run.wins + ' straight-up games.' + (run.newBest ? ' NEW BEST!' : ' Best: ' + meta.gauntletBest + '.') : champ ? 'The ' + E.teamName(run.team) + ' win the World Series. Absolute ballclub.' : (run.stage < 8 ? 'The ' + E.TEAMS[run.team].nick + ' got you fired in game ' + (run.stage + 1) + '.' : 'The ' + E.TEAMS[run.team].nick + ' are out in the ' + E.stageLabel(run, Math.min(run.stage, 11)) + '.')}</p>
+    ${run.unlocked ? `<p class="y" style="font-size:23px">PRESSURE ${run.unlocked} UNLOCKED</p>` : ''}
+    ${run.mode === 'daily' ? '<p class="dim" style="font-size:20px">A new Daily Game drops tomorrow.</p>' : ''}
+    <div class="px" style="width:100%;text-align:left;line-height:1.7;font-size:22px">
       RECORD <span class="y">${run.wins}-${run.losses}</span><br>
       HOME RUNS <span class="y">${run.stats.hr}</span><br>
       RUNS SCORED <span class="y">${run.stats.runs}</span><br>
       STEALS <span class="y">${run.stats.steals}</span><br>
-      RELICS <span class="y">${run.relics.map(id => E.RELICS[id].name).join(', ')}</span>
+      RELICS <span class="y">${run.relics.map(id => E.RELICS[id].name).join(', ')}</span><br>
+      BEST PLAYER <span class="y">${(() => { const b = run.lineup.concat(run.pitchers).reduce((a, p) => (E.ovr(p) > E.ovr(a) ? p : a)); return b.name + ' (' + E.TIERS[tierOf(b)].name + ')'; })()}</span>
     </div>
     <button class="btn go" id="again">NEW RUN</button><button class="btn" id="home">TITLE</button>
   </div>`);
   store.del('pinetar.run');
-  $('#again').onclick = () => { snd('click'); newDraft(); };
+  $('#again').onclick = () => { snd('click'); screenModes(); };
   $('#home').onclick = () => { snd('click'); screenTitle(); };
 }
 

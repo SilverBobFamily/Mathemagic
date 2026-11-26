@@ -23,18 +23,24 @@ function sample(h, arr, n) {
 const hashSeed = (a, b) => ((a * 2654435761) ^ (b * 40503 + 977)) | 0;
 
 /* ---------- data ---------- */
-/* Real players, slightly bent. */
-const HITTERS = ['Derek Jetter','Ken Griffly Jr.','Barry Bondz','Babe Ruthe','Hank Aron','Willie Mayes','Mickey Mantel','Ted Willians','Joe DiMadgio','Jackie Robinsen','Roberto Clementi','Cal Ripkin Jr.','Tony Gwinn','Wade Boggz','Ozzie Smitt','Rickey Henderzon','Mike Trowt','Mookie Bettz','Aaron Judd','Juan Sotto','Ronald Acunya','Freddie Freedman','Bryce Harpur','Manny Machadoh','Fernando Tatiz Jr.','Vlad Guerrera Jr.','Bobby Whitt Jr.','Julio Rodriguex','Corey Seegar','Jose Altuvay','Francisco Lindar','Pete Alonzo','Paul Goldschmitt','Nolan Arenada','Albert Pujolz','Miguel Cabrero','David Ortez','Manny Ramires','Chipper Jonez','Ichiro Suzaki','Frank Thoma','Jim Thomey','Ryne Sandburg','Ernie Banx','Kirby Puckette','George Brette','Mike Schmitt','Johnny Benchley','Yogi Berrie','Pete Rosey','Reggie Jaxon','Rod Carewe','Joe Morgen','Craig Biggo','Jeff Bagwill','Larry Walkar','Todd Heltin','Buster Posie','Adrian Beltry','Ivan Rodriquez','Joey Vottle','Gunnar Hendersen','Elly De La Cruise','Corbin Carrol','Kyle Tucket','Yordan Alvares','Adley Rutschmann','Rafael Devors','Bo Bichett','Jose Ramirex','Christian Yelick','Andrew McCutchon','Kris Brynt','Anthony Rizzoh','Javy Baes','Matt Olsen','Austin Rilley','Marcus Semian','Cody Bellinjer','Salvador Perezz','Byron Buxtin','Carlos Correra','Trea Turnor','Kyle Schwarbar','J.T. Realmutto','Xander Bogaerds','Dustin Pedroya','Josh Hamiltin','Evan Longorio','Giancarlo Stantin','Pete Crow-Armstrung','Wyatt Langferd','Jackson Chorio','Ketel Marty','Shohei Ohtoni'];
-const PITCHERS = ['Josh Smoltz','Greg Matlox','Tom Glovine','Pedro Martinex','Randy Johnstone','Roger Clemmons','Nolan Rayan','Sandy Koufox','Bob Gibsen','Tom Seever','Mariano Riviera','Trevor Hoffmore','Dennis Eckerslee','Clayton Kershew','Justin Verlaine','Max Scherzar','Jacob deGroom','Gerrit Kole','Felix Hernandes','Roy Holliday','CC Sabbathia','Curt Schilly','Johan Santanna','Zack Grienke','David Prize','Chris Sail','Madison Bumgardner','Tim Lincecomb','Corey Kluver','Stephen Strassburger','Aroldis Chapmen','Craig Kimbrow','Billy Wagoner','Jon Lestor','Cole Hammels','Blake Snail','Spencer Stryder','Paul Skeens','Tarik Skubble','Corbin Burns','Shane Bieberman','Walker Bueller','Yoshi Yamamota','Dwight Goodin','Fernando Valenzuelo','Bert Blylevin','Satchel Paage','Cy Youngblood','Orel Hershizer','Jim Palmore','Juan Marichol','Fergie Jenkens','Rollie Fingerz','Goose Gossarge','Kenley Jansin','Josh Haider','Edwin Dias','Kodai Senka','Logan Webber','Zack Wheelor','Aaron Nolo','Framber Valdex','Dylan Ceese'];
 let TAKEN = null; // Set of names already on the team being generated
-function pickName(h, list) {
+const PDB = (typeof module !== 'undefined' && module.exports) ? require('./players.js') : root.PT_PLAYERS;
+const TIERS = PDB.TIERS;
+/* weighted rarity roll. lift 0..1 shifts odds toward the good stuff */
+function rollTier(h, lift, legendX) {
+  lift = clamp(lift || 0, 0, 1);
+  const w = { C: Math.max(8, 58 - 44 * lift), U: 28 + 6 * lift, R: 11 + 22 * lift, L: (3 + 9 * lift) * (legendX || 1) };
+  let r = rf(h) * (w.C + w.U + w.R + w.L);
+  for (const t of ['L', 'R', 'U', 'C']) { if ((r -= w[t]) < 0) return t; }
+  return 'C';
+}
+function pickName(h, kind, tier) {
+  const list = PDB.DB[kind === 'bat' ? 'bat' : 'pit'][tier || 'C'];
   let n = pick(h, list);
   for (let i = 0; TAKEN && TAKEN.has(n) && i < 12; i++) n = pick(h, list);
   if (TAKEN) TAKEN.add(n);
   return n;
 }
-const FIRST = ['Mo','Tito','Dex','Rudy','Lou','Cal','Jimmy','Hank','Ozzie','Pablo','Nate','Gus','Ty','Wally','Marty','Ike','Felix','Dante','Cruz','Buck','Sal','Rex','Boog','Chuy','Flip','Gabe','Ivan','Kip','Lenny','Milo','Pete','Quincy','Rocco','Stu','Toby','Vic','Walt','Yogi','Zeke','Andre'];
-const LAST = ['Vega','Okafor','Lindqvist','Brannigan','Tanaka','Mulligan','Delgado','Kowalski','Nguyen','Abernathy','Castillo','Dubois','Fitch','Gallo','Haverty','Ibarra','Jankowski','Kimura','Lombardi','Moreau','Novak','Ortega','Pruitt','Quigley','Rosario','Sato','Tran','Underhill','Voss','Whitaker','Yoo','Zimmer','Baptiste','Crumb','Dooley','Espinoza','Flanagan','Grizzly','Hobbs','Jones'];
 const POS = ['C','1B','2B','3B','SS','LF','CF','RF','DH'];
 
 const BAT_TRAITS = {
@@ -150,22 +156,91 @@ function makeSchedule(h, us) {
   return reg.concat(po, [pick(h, other)]);
 }
 const TOTAL_STAGES = 12;
+const MODES = {
+  season:   { name: 'SEASON',   desc: '12 games: 8 in your league, then 4 playoff rounds. Climb the Pressure ladder.' },
+  daily:    { name: 'DAILY GAME', desc: 'Same city, rosters and twists for everyone today. One shot.' },
+  gauntlet: { name: 'GAUNTLET', desc: 'Endless. Every game is harder. How many can you win before 3 losses?' },
+};
+const PRESSURE = [
+  { name: 'ROOKIE',     desc: 'The standard season.' },
+  { name: 'PRESSURE 1', desc: 'Opponents +3 across the board.' },
+  { name: 'PRESSURE 2', desc: 'Start with $0.' },
+  { name: 'PRESSURE 3', desc: 'Shop prices +1.' },
+  { name: 'PRESSURE 4', desc: 'Every opponent brings an extra trick.' },
+  { name: 'PRESSURE 5', desc: 'Only 2 CLUTCH charges per game.' },
+  { name: 'PRESSURE 6', desc: 'Free picks offer 2 choices, not 3.' },
+  { name: 'PRESSURE 7', desc: 'Only 2 losses allowed.' },
+  { name: 'PRESSURE 8', desc: 'The World Series opponent is stacked.' },
+];
+const DAILY_MODS = {
+  juiced:   { name: 'Juiced Balls',        desc: 'Home runs x1.4 for everyone.' },
+  deadarms: { name: 'Dead Arms',           desc: 'Every pitcher -4 stamina.' },
+  bandbox:  { name: 'Bandbox Parks',       desc: '+8 POW for every hitter.' },
+  smallmkt: { name: 'Small Market',        desc: 'Start with $0, +2 gold per win.' },
+  quick:    { name: 'Rain-Shortened',      desc: 'Games are 5 innings.' },
+  deep:     { name: 'Deep Pockets',        desc: 'Start with $12, shop prices +1.' },
+  oldtimers:{ name: 'Old-Timers Day',      desc: 'Legends show up 3x as often.' },
+  speedway: { name: 'Speedway',            desc: '+12 SPD for every runner.' },
+  aces:     { name: 'Year of the Pitcher', desc: '+8 STUFF for every pitcher.' },
+};
+function buildCfg(mode, pressure, dmods) {
+  const P = mode === 'season' ? (pressure || 0) : 0;
+  const c = { oppBoost: 0, startGold: 3, priceUp: 0, extraQuirk: 0, clutch: 3, rewardN: 3, maxLosses: 3, wsBoost: 0,
+    hr: 1, sta: 0, pow: 0, spd: 0, stf: 0, gameLen: GAME_LEN, winGold: 0, legendX: 1 };
+  if (P >= 1) c.oppBoost += 3;
+  if (P >= 2) c.startGold = 0;
+  if (P >= 3) c.priceUp += 1;
+  if (P >= 4) c.extraQuirk += 1;
+  if (P >= 5) c.clutch = 2;
+  if (P >= 6) c.rewardN = 2;
+  if (P >= 7) c.maxLosses = 2;
+  if (P >= 8) c.wsBoost = 6;
+  (dmods || []).forEach(m => {
+    if (m === 'juiced') c.hr *= 1.4;
+    if (m === 'deadarms') c.sta -= 4;
+    if (m === 'bandbox') c.pow += 8;
+    if (m === 'smallmkt') { c.startGold = 0; c.winGold += 2; }
+    if (m === 'quick') c.gameLen = 5;
+    if (m === 'deep') { c.startGold = 12; c.priceUp += 1; }
+    if (m === 'oldtimers') c.legendX = 3;
+    if (m === 'speedway') c.spd += 12;
+    if (m === 'aces') c.stf += 8;
+  });
+  return c;
+}
+function dailyInfo(dateKey) {
+  const n = parseInt(String(dateKey).replace(/\D/g, ''), 10) || 1;
+  const h = { rs: hashSeed(n, 31337) };
+  const keys = Object.keys(TEAMS);
+  return { seed: hashSeed(n, 99), team: pick(h, keys), dmods: sample(h, Object.keys(DAILY_MODS), 2), dateKey };
+}
+const cfgOf = run => run.cfg || buildCfg('season', 0, []);
+const isEndless = run => run.mode === 'gauntlet';
 const MAX_LOSSES = 3;
 const GAME_LEN = 6;
 
 /* ---------- players ---------- */
 const newId = h => 'p' + Math.floor(rf(h) * 1e9).toString(36);
-function genBatter(h, q, bias, traitP) {
-  bias = bias || {};
-  const g = k => clamp(Math.round(norm(h, q + (bias[k] || 0), 8)), 20, 99);
-  const p = { id: newId(h), kind: 'bat', name: pickName(h, HITTERS), con: g('con'), pow: g('pow'), eye: g('eye'), spd: g('spd'), def: g('def'), trait: null, look: ri(h, 1, 999999) };
-  if (chance(h, traitP == null ? 0.22 : traitP)) p.trait = pick(h, Object.keys(BAT_TRAITS));
+function traitChance(traitP, tier) {
+  const t = TIERS[tier].trait;
+  if (traitP == null) return t;
+  if (traitP === 0) return tier === 'L' ? 1 : 0;
+  return Math.max(traitP, t);
+}
+function genBatter(h, q, bias, traitP, tier) {
+  bias = bias || {}; tier = tier || 'C';
+  const bq = q + TIERS[tier].boost;
+  const g = k => clamp(Math.round(norm(h, bq + (bias[k] || 0), 8)), 20, 99);
+  const p = { id: newId(h), kind: 'bat', tier, name: pickName(h, 'bat', tier), con: g('con'), pow: g('pow'), eye: g('eye'), spd: g('spd'), def: g('def'), trait: null, look: ri(h, 1, 999999) };
+  if (chance(h, traitChance(traitP, tier))) p.trait = pick(h, Object.keys(BAT_TRAITS));
   return p;
 }
-function genPitcher(h, q, kind, traitP) {
+function genPitcher(h, q, kind, traitP, tier) {
+  tier = tier || 'C';
+  const bq = q + TIERS[tier].boost;
   const g = (m) => clamp(Math.round(norm(h, m, 8)), 20, 99);
-  const p = { id: newId(h), kind, name: pickName(h, PITCHERS), stf: g(q), ctl: g(q), sta: kind === 'sp' ? ri(h, 13, 19) : ri(h, 5, 8), trait: null, look: ri(h, 1, 999999) };
-  if (chance(h, traitP == null ? 0.25 : traitP)) {
+  const p = { id: newId(h), kind, tier, name: pickName(h, 'pit', tier), stf: g(bq), ctl: g(bq), sta: (kind === 'sp' ? ri(h, 13, 19) : ri(h, 5, 8)) + (tier === 'L' ? 2 : tier === 'R' ? 1 : 0), trait: null, look: ri(h, 1, 999999) };
+  if (chance(h, traitChance(traitP, tier))) {
     const keys = Object.keys(PIT_TRAITS).filter(k => k !== 'closer' || kind === 'rp');
     p.trait = pick(h, keys);
   }
@@ -174,14 +249,16 @@ function genPitcher(h, q, kind, traitP) {
 const ovr = p => p.kind === 'bat'
   ? Math.round((p.con * 1.3 + p.pow * 1.1 + p.eye * 0.8 + p.spd * 0.4 + p.def * 0.4) / 4)
   : Math.round((p.stf * 1.6 + p.ctl * 1.1 + Math.min(99, p.sta * 3.5) * 0.3) / 3);
-const playerPrice = p => clamp(Math.round(2 + (ovr(p) - 45) / 3), 3, 13);
+const TIER_PREMIUM = { C: 0, U: 1, R: 2, L: 4 };
+const playerPrice = (p, stage) => clamp(Math.round(4 + (ovr(p) - (stage == null ? 50 : 47 + Math.min(stage, 14) * 1.9 + Math.max(0, stage - 14))) / 3) + (TIER_PREMIUM[p.tier || 'C'] || 0), 3, 14);
 
 /* ---------- run (the roguelite layer) ---------- */
 function makeStartTeam(h, key) {
   const a = ARCH[key];
   TAKEN = new Set();
-  const lineup = POS.map(() => genBatter(h, 50, a.bias, 0.2));
-  const pitchers = [genPitcher(h, 52 + a.pit, 'sp', 0.4), genPitcher(h, 50 + a.pit, 'rp', 0.3), genPitcher(h, 48 + a.pit, 'rp', 0.3)];
+  const uSlots = sample(h, [0, 1, 2, 3, 4, 5, 6, 7, 8], 2);
+  const lineup = POS.map((_, i) => genBatter(h, 49, a.bias, 0.2, uSlots.includes(i) ? 'U' : 'C'));
+  const pitchers = [genPitcher(h, 51 + a.pit, 'sp', 0.4, 'U'), genPitcher(h, 50 + a.pit, 'rp', 0.3), genPitcher(h, 48 + a.pit, 'rp', 0.3)];
   TAKEN = null;
   return { lineup, pitchers };
 }
@@ -189,10 +266,14 @@ function newDraft(seed) {
   const h = { rs: seed | 0 };
   return Object.keys(ARCH).map(k => ({ key: k, name: ARCH[k].name, desc: ARCH[k].desc, relic: ARCH[k].relic, team: makeStartTeam(h, k) }));
 }
-function startRun(opt, seed, teamKey) {
+function startRun(opt, seed, teamKey, o) {
+  o = o || {};
   if (!TEAMS[teamKey]) teamKey = 'BOS';
+  const mode = o.mode || 'season', pressure = o.pressure || 0, dmods = o.dmods || [];
+  const cfg = buildCfg(mode, pressure, dmods);
   const run = {
-    v: 2, seed: seed | 0, rs: hashSeed(seed, 7), arch: opt.key, team: teamKey, schedule: null, stage: 0, wins: 0, losses: 0, gold: 3,
+    v: 3, mode, pressure, dmods, dateKey: o.dateKey || null, cfg, clutchBonus: 0, lossBonus: 0, nextQuirk: 0, event: null, lastEventStage: -9,
+    seed: seed | 0, rs: hashSeed(seed, 7), arch: opt.key, team: teamKey, schedule: null, stage: 0, wins: 0, losses: 0, gold: cfg.startGold,
     lineup: opt.team.lineup, pitchers: opt.team.pitchers, relics: [opt.relic],
     phase: 'club', shop: null, rewards: null, rerolls: 0, done: false, champion: false, history: [], G: null,
     stats: { hr: 0, runs: 0, steals: 0 },
@@ -201,22 +282,134 @@ function startRun(opt, seed, teamKey) {
   run.shop = makeShop(run);
   return run;
 }
-function stageQuality(stage) { return 49 + stage * 1.9; }
+function stageQuality(stage) { return 46 + Math.min(stage, 14) * 1.9 + Math.max(0, stage - 14) * 1.0; }
 function oppFor(run) {
-  const st = run.stage;
+  const st = run.stage, cfg = cfgOf(run), endless = isEndless(run);
   const h = { rs: hashSeed(run.seed, 100 + st) };
-  const boss = st >= 8;
-  const S = 44 + st * 2.1 + (boss ? 1 : 0) + (st === 11 ? 2 : 0);
-  const key = run.schedule[st], T = TEAMS[key];
-  const nq = boss ? (st === 11 ? 2 : 1) : (st >= 4 ? 1 : (chance(h, 0.5) ? 1 : 0));
-  const quirks = sample(h, Object.keys(QUIRKS), Math.max(nq, st === 11 ? 2 : nq));
+  const boss = endless ? (st % 5 === 4) : st >= 8;
+  let S = endless ? 44 + st * 2.0 + (boss ? 3 : 0) : 44 + st * 2.1 + (boss ? 1 : 0) + (st === 11 ? 2 + cfg.wsBoost : 0);
+  S += cfg.oppBoost - 3; // tiers add ~3 on average
+  let key = run.schedule[st];
+  if (!key) { const keys = Object.keys(TEAMS).filter(k => k !== run.team); key = keys[Math.abs(hashSeed(run.seed, 777 + st)) % keys.length]; }
+  const T = TEAMS[key];
+  let nq = endless ? Math.min(4, Math.floor(st / 4) + (boss ? 1 : 0)) : boss ? (st === 11 ? 2 : 1) : (st >= 4 ? 1 : (chance(h, 0.5) ? 1 : 0));
+  nq = Math.min(5, nq + cfg.extraQuirk + (run.nextQuirk || 0));
+  const quirks = sample(h, Object.keys(QUIRKS), nq);
+  const lift = endless ? Math.min(1, st / 30) : st / 24;
   TAKEN = new Set();
-  const lineup = POS.map(() => genBatter(h, S, null, 0));
-  const pitchers = [genPitcher(h, S + 3, 'sp', 0), genPitcher(h, S, 'rp', 0), genPitcher(h, S - 2, 'rp', 0)];
+  const lineup = POS.map(() => genBatter(h, S, null, 0, rollTier(h, lift)));
+  const pitchers = [genPitcher(h, S + 3, 'sp', 0, rollTier(h, lift)), genPitcher(h, S, 'rp', 0, rollTier(h, lift)), genPitcher(h, S - 2, 'rp', 0, rollTier(h, lift))];
   TAKEN = null;
   const T2 = TEAMS[run.team];
-  const where = st < 8 ? (T.div === T2.div && T.lg === T2.lg ? T.lg + ' ' + T.div.toUpperCase() : LEAGUES[T.lg].toUpperCase()) : stageLabel(run, st);
-  return { stage: st, key, label: stageLabel(run, st), where, name: teamName(key), city: T.city, nick: T.nick, abbr: key, colors: T.colors, S, quirks, lineup, pitchers, boss };
+  const label = endless ? 'GAUNTLET ' + (st + 1) + (boss ? ' BOSS' : '') : stageLabel(run, st);
+  const where = endless ? (T.lg + ' ' + T.div.toUpperCase()) : st < 8 ? (T.div === T2.div && T.lg === T2.lg ? T.lg + ' ' + T.div.toUpperCase() : LEAGUES[T.lg].toUpperCase()) : stageLabel(run, st);
+  return { stage: st, key, label, where, name: teamName(key), city: T.city, nick: T.nick, abbr: key, colors: T.colors, S, quirks, lineup, pitchers, boss };
+}
+
+/* ---------- events between games ---------- */
+const EVENTS = {
+  scout:   { title: 'A SCOUT CALLS', text: 'A guy in a windbreaker swears he found a kid who can really play. He wants $5 for the tip.' },
+  poker:   { title: 'CLUBHOUSE POKER', text: 'The bullpen guys have a card game going. Buy in for $4. Winner takes $9.' },
+  mentor:  { title: 'GRIZZLED VETERAN', text: 'A 41-year-old bench coach offers to work with your weakest hitter. Or he\'ll sell you his memoir rights.' },
+  hammy:   { title: 'TWEAKED HAMSTRING', text: 'Your fastest hitter felt something pop running out a grounder.' },
+  fans:    { title: 'FAN APPRECIATION NIGHT', text: 'The crowd is electric. The owner is in a good mood.' },
+  trade:   { title: 'TRADE DEADLINE CALL', text: 'A GM on line two wants your worst hitter. He won\'t say who you\'d get back.' },
+  rain:    { title: 'RAIN DELAY', text: 'Three hours of tarp. You can work the pitchers in the cage or work the autograph line.' },
+  gum:     { title: 'MYSTERY BUBBLE GUM', text: 'A pack of gum in the dugout has a weird glow. Chewing it feels like a bad idea.' },
+  socks:   { title: 'LUCKY SOCKS', text: 'A fan offers you a pair of socks that haven\'t been washed since 2004. Supposedly lucky. $7.' },
+  dogs:    { title: 'DOLLAR DOG NIGHT', text: 'The whole lineup wants to hit the concourse before the game.' },
+};
+function eventChoices(run) {
+  const e = run.event; if (!e) return [];
+  const g = run.gold;
+  switch (e.id) {
+    case 'scout':  return [{ label: 'PAY $5', desc: 'Sign a Rare or Legendary prospect', ok: g >= 5 }, { label: 'HANG UP', desc: 'Nothing happens', ok: true }];
+    case 'poker':  return [{ label: 'BUY IN $4', desc: '50%: win $9. 50%: lose it', ok: g >= 4 }, { label: 'GO TO BED', desc: 'Nothing happens', ok: true }];
+    case 'mentor': return [{ label: 'TAKE THE LESSONS', desc: 'Weakest hitter: +6 CON, +6 EYE', ok: true }, { label: 'BUY THE MEMOIR', desc: '+$4', ok: true }];
+    case 'hammy':  return [{ label: 'PLAY THROUGH IT', desc: 'Fastest hitter: -8 SPD for good', ok: true }, { label: 'PAY THE TRAINER', desc: '-$3, no harm done', ok: g >= 3 }];
+    case 'fans':   return [{ label: 'PASS THE HAT', desc: '+$5', ok: true }, { label: 'FEED OFF IT', desc: '+1 CLUTCH every game, rest of the run', ok: true }];
+    case 'trade':  return [{ label: 'MAKE THE DEAL', desc: 'Worst hitter for a mystery player', ok: true }, { label: 'HANG UP', desc: 'Nothing happens', ok: true }];
+    case 'rain':   return [{ label: 'CAGE WORK', desc: '+4 STF to every pitcher', ok: true }, { label: 'SIGN AUTOGRAPHS', desc: '+$3', ok: true }];
+    case 'gum':    return [{ label: 'CHEW IT', desc: 'Random relic. Next opponent gets an extra trick', ok: true }, { label: 'TOSS IT', desc: 'Nothing happens', ok: true }];
+    case 'socks':  return [{ label: 'BUY THE SOCKS $7', desc: '+1 loss allowed this run', ok: g >= 7 }, { label: 'NO THANKS', desc: 'Nothing happens', ok: true }];
+    case 'dogs':   return [{ label: 'LET THEM EAT', desc: 'Every hitter +3 POW, -3 SPD', ok: true }, { label: 'SALAD BAR', desc: 'Every hitter +2 EYE', ok: true }];
+  }
+  return [];
+}
+function maybeEvent(run) {
+  if (run.done || run.stage - run.lastEventStage < 2 || run.stage < 1) return;
+  const h = run;
+  if (!chance(h, 0.45)) return;
+  run.event = { id: pick(h, Object.keys(EVENTS)) };
+  run.lastEventStage = run.stage;
+}
+const worst = arr => arr.reduce((a, p) => (ovr(p) < ovr(a) ? p : a), arr[0]);
+function resolveEvent(run, idx) {
+  const e = run.event; if (!e) return null;
+  const ch = eventChoices(run)[idx]; if (!ch || !ch.ok) return null;
+  const h = run; let text = '', give = null;
+  const lu = run.lineup;
+  switch (e.id) {
+    case 'scout':
+      if (idx === 0) {
+        run.gold -= 5; TAKEN = rosterNames(run);
+        const tier = chance(h, 0.2) ? 'L' : 'R', q = stageQuality(run.stage) - 2;
+        const p = chance(h, 0.6) ? genBatter(h, q, null, 0.6, tier) : genPitcher(h, q, chance(h, 0.5) ? 'sp' : 'rp', 0.6, tier);
+        TAKEN = null; give = { t: p.kind === 'bat' ? 'bat' : 'pit', p };
+        text = 'The kid is legit: ' + p.name + ' (' + TIERS[tier].name + ').';
+      } else text = 'You hang up. Probably fine.';
+      break;
+    case 'poker':
+      if (idx === 0) { run.gold -= 4; if (chance(h, 0.5)) { run.gold += 9; text = 'Full house. You rake in $9.'; } else text = 'The backup catcher had aces. You\'re out $4.'; }
+      else text = 'Smart. Early night.';
+      break;
+    case 'mentor':
+      if (idx === 0) { const p = worst(lu); p.con = Math.min(99, p.con + 6); p.eye = Math.min(99, p.eye + 6); text = p.name + ' looks like a new hitter. +6 CON, +6 EYE.'; }
+      else { run.gold += 4; text = 'The memoir is terrible. +$4.'; }
+      break;
+    case 'hammy': {
+      const p = lu.reduce((a, q) => (q.spd > a.spd ? q : a), lu[0]);
+      if (idx === 0) { p.spd = Math.max(20, p.spd - 8); text = p.name + ' plays through it. -8 SPD.'; }
+      else { run.gold -= 3; text = 'The trainer works a miracle. ' + p.name + ' is fine.'; }
+      break;
+    }
+    case 'fans':
+      if (idx === 0) { run.gold += 5; text = 'The hat comes back heavy. +$5.'; }
+      else { run.clutchBonus = (run.clutchBonus || 0) + 1; text = 'The dugout is buzzing. +1 CLUTCH every game.'; }
+      break;
+    case 'trade':
+      if (idx === 0) {
+        const old = worst(lu), slot = lu.indexOf(old);
+        TAKEN = rosterNames(run);
+        const r = rf(h), tier = r < 0.3 ? 'C' : r < 0.7 ? 'U' : r < 0.94 ? 'R' : 'L';
+        const p = genBatter(h, stageQuality(run.stage), null, 0.4, tier); TAKEN = null;
+        lu[slot] = p; text = old.name + ' is gone. Say hello to ' + p.name + ' (' + TIERS[tier].name + ').';
+        e.gotPlayer = p;
+      } else text = 'You hang up. Loyalty.';
+      break;
+    case 'rain':
+      if (idx === 0) { run.pitchers.forEach(p => { p.stf = Math.min(99, p.stf + 4); }); text = 'Bullpen sessions in the cage. +4 STF to every pitcher.'; }
+      else { run.gold += 3; text = 'Sharpies out. +$3.'; }
+      break;
+    case 'gum':
+      if (idx === 0) {
+        const pool = Object.keys(RELICS).filter(k => !run.relics.includes(k));
+        run.nextQuirk = 1;
+        if (pool.length) { const id = pick(h, pool); give = { t: 'relic', id }; text = 'You feel... different. Found: ' + RELICS[id].name + '. The next team heard about it, though.'; }
+        else { run.gold += 4; text = 'Nothing happens, except $4 falls out of the wrapper.'; }
+      } else text = 'Into the trash it goes.';
+      break;
+    case 'socks':
+      if (idx === 0) { run.gold -= 7; run.lossBonus = (run.lossBonus || 0) + 1; text = 'They smell like victory. You can lose one more game.'; }
+      else text = 'Your nose thanks you.';
+      break;
+    case 'dogs':
+      if (idx === 0) { lu.forEach(p => { p.pow = Math.min(99, p.pow + 3); p.spd = Math.max(20, p.spd - 3); }); text = 'Thirty-six hot dogs later: +3 POW, -3 SPD.'; }
+      else { lu.forEach(p => { p.eye = Math.min(99, p.eye + 2); }); text = 'Clean living. +2 EYE.'; }
+      break;
+  }
+  run.event = null;
+  return { text, give };
 }
 
 function makeTraining(h, n) { return sample(h, Object.keys(TRAINING), n); }
@@ -228,28 +421,30 @@ function makeShop(run) {
   const owned = new Set(run.relics);
   const relicPool = Object.keys(RELICS).filter(k => !owned.has(k));
   const items = [];
-  sample(h, relicPool, 2).forEach(id => items.push({ t: 'relic', id, price: RELICS[id].price }));
-  const b = genBatter(h, q + 3, null, 0.4); items.push({ t: 'bat', p: b, price: playerPrice(b) });
-  const p2 = chance(h, 0.5) ? genBatter(h, q + 3, null, 0.4) : genPitcher(h, q + 3, chance(h, 0.45) ? 'sp' : 'rp', 0.5);
-  items.push({ t: p2.kind === 'bat' ? 'bat' : 'pit', p: p2, price: playerPrice(p2) });
-  makeTraining(h, 2).forEach(id => items.push({ t: 'train', id, price: 3 }));
+  const cfg = cfgOf(run), up = cfg.priceUp, lift = Math.min(1, run.stage / 16), lx = cfg.legendX;
+  sample(h, relicPool, 2).forEach(id => items.push({ t: 'relic', id, price: RELICS[id].price + up }));
+  const b = genBatter(h, q, null, 0.4, rollTier(h, lift, lx)); items.push({ t: 'bat', p: b, price: playerPrice(b, run.stage) + up });
+  const p2 = chance(h, 0.5) ? genBatter(h, q, null, 0.4, rollTier(h, lift, lx)) : genPitcher(h, q, chance(h, 0.45) ? 'sp' : 'rp', 0.5, rollTier(h, lift, lx));
+  items.push({ t: p2.kind === 'bat' ? 'bat' : 'pit', p: p2, price: playerPrice(p2, run.stage) + up });
+  makeTraining(h, 2).forEach(id => items.push({ t: 'train', id, price: 3 + up }));
   TAKEN = null;
   return items;
 }
 function makeRewards(run) {
   const h = run;
   TAKEN = rosterNames(run);
-  const q = stageQuality(run.stage) + 6;
+  const q = stageQuality(run.stage) + 2;
+  const cfg = cfgOf(run), lift = Math.min(1, 0.25 + run.stage / 14), lx = cfg.legendX;
   const owned = new Set(run.relics);
   const pool = Object.keys(RELICS).filter(k => !owned.has(k));
   const out = [];
   if (pool.length) out.push({ t: 'relic', id: pick(h, pool) });
-  const b = genBatter(h, q, null, 0.55); out.push({ t: 'bat', p: b });
-  const pp = genPitcher(h, q, chance(h, 0.4) ? 'sp' : 'rp', 0.6);
+  const b = genBatter(h, q, null, 0.55, rollTier(h, lift, lx)); out.push({ t: 'bat', p: b });
+  const pp = genPitcher(h, q, chance(h, 0.4) ? 'sp' : 'rp', 0.6, rollTier(h, lift, lx));
   const mix = [{ t: 'pit', p: pp }, { t: 'train', id: pick(h, Object.keys(TRAINING)), free: true }, { t: 'gold', amt: 6 }];
   out.push(pick(h, mix));
   TAKEN = null;
-  return out.slice(0, 3);
+  return out.slice(0, cfg.rewardN);
 }
 function rerollShop(run) {
   const cost = 2 + run.rerolls;
@@ -287,8 +482,9 @@ function newGame(run) {
     stage: run.stage, oppName: opp.name, oppNick: opp.nick, oppAbbr: opp.abbr, oppColors: opp.colors, oppLabel: opp.label, boss: opp.boss,
     usAbbr: run.team, usColors: TEAMS[run.team].colors,
     inn: 1, half: 'top', outs: 0, bases: [null, null, null], score: { us: 0, opp: 0 }, line: { us: [], opp: [0] },
-    len: GAME_LEN, over: false, winner: null, walkoff: false,
-    clutch: 3 + (run.relics.includes('seeds') ? 2 : 0), used: {},
+    len: cfgOf(run).gameLen, over: false, winner: null, walkoff: false,
+    gm: { hr: cfgOf(run).hr, sta: cfgOf(run).sta, pow: cfgOf(run).pow, spd: cfgOf(run).spd, stf: cfgOf(run).stf },
+    clutch: cfgOf(run).clutch + (run.clutchBonus || 0) + (run.relics.includes('seeds') ? 2 : 0), used: {},
     log: [], pa: 0,
     t: {
       us:  { lineup: run.lineup.map(p => Object.assign({}, p)), pitchers: run.pitchers.map(p => Object.assign({}, p)), pi: 0, idx: 0, bf: {}, relics: run.relics.slice(), quirks: [] },
@@ -296,6 +492,7 @@ function newGame(run) {
     },
     stats: { hr: 0, runs: 0, steals: 0, k: 0 },
   };
+  run.nextQuirk = 0;
   startHalf(G);
   return G;
 }
@@ -303,7 +500,7 @@ const other = s => (s === 'us' ? 'opp' : 'us');
 const curPitcher = (G, key) => G.t[key].pitchers[G.t[key].pi];
 function gasOf(G, key, p) {
   const t = G.t[key];
-  let st = p.sta + (p.trait === 'workhorse' ? 4 : 0) + (p.kind === 'rp' && t.relics.includes('bullpen_cart') ? 4 : 0);
+  let st = p.sta + (p.trait === 'workhorse' ? 4 : 0) + (p.kind === 'rp' && t.relics.includes('bullpen_cart') ? 4 : 0) + ((G.gm && G.gm.sta) || 0);
   return st - (t.bf[p.id] || 0);
 }
 function teamMods(G, key, role, x) {
@@ -311,6 +508,8 @@ function teamMods(G, key, role, x) {
   const t = G.t[key];
   for (const id of t.relics) { const r = RELICS[id]; if (r && r.fx) r.fx(m, role, x); }
   for (const q of t.quirks) QUIRKS[q].fx(m, role, x);
+  const gm = G.gm;
+  if (gm) { if (role === 'bat') { m.pow += gm.pow; m.spd += gm.spd; m.hr *= gm.hr; } else m.stf += gm.stf; }
   return m;
 }
 
@@ -737,21 +936,29 @@ function finishGame(run, G) {
   let gold = 0;
   if (won) {
     run.wins++;
-    gold = 4 + Math.floor(run.stage / 3) + (run.relics.includes('piggy') ? 3 : 0);
+    gold = 4 + Math.min(4, Math.floor(run.stage / 3)) + (run.relics.includes('piggy') ? 3 : 0) + cfgOf(run).winGold;
   } else { run.losses++; gold = 2; }
   run.gold += gold;
   const info = { won, gold };
-  if (!won && run.losses >= MAX_LOSSES) { run.done = true; run.phase = 'over'; return info; }
+  if (!won && run.losses >= maxLosses(run)) { run.done = true; run.phase = 'over'; return info; }
   run.stage++;
-  if (run.stage >= TOTAL_STAGES) { run.done = true; run.champion = true; run.phase = 'over'; return info; }
+  if (!isEndless(run) && run.stage >= TOTAL_STAGES) { run.done = true; run.champion = true; run.phase = 'over'; return info; }
   run.phase = 'club'; run.rerolls = 0;
   run.rewards = won ? makeRewards(run) : null;
   run.shop = makeShop(run);
+  maybeEvent(run);
   return info;
+}
+function maxLosses(run) { return cfgOf(run).maxLosses + (run.lossBonus || 0); }
+function totalStages(run) { return isEndless(run) ? Infinity : TOTAL_STAGES; }
+function allPlayers() {
+  const out = [];
+  ['bat', 'pit'].forEach(k => ['L', 'R', 'U', 'C'].forEach(t => PDB.DB[k][t].forEach(n => out.push({ name: n, kind: k, tier: t }))));
+  return out;
 }
 
 const api = {
-  TEAMS, LEAGUES, teamName, stageLabel,
+  TEAMS, LEAGUES, teamName, stageLabel, TIERS, MODES, PRESSURE, DAILY_MODS, EVENTS, buildCfg, dailyInfo, eventChoices, resolveEvent, maxLosses, totalStages, allPlayers, rollTier,
   RELICS, QUIRKS, TRAINING, ARCH, BAT_TRAITS, PIT_TRAITS, APPR_BAT, APPR_PIT, POS, STAGE_LABELS, TOTAL_STAGES, MAX_LOSSES, GAME_LEN,
   newDraft, startRun, oppFor, makeShop, makeRewards, rerollShop, placePlayer, applyTraining, addRelic, playerAt, finishGame,
   newGame, nextPA, resolve, preview, stealProb, buntProb, curPitcher, gasOf, ovr, playerPrice,
