@@ -611,6 +611,7 @@ function screenClub() {
       <div class="stats" style="font-size:19px;margin-bottom:6px"><span>BATS ${cmp(my.bat, theirBat)}</span><span>ARM ${cmp(my.sp, theirSp)}</span></div>
       <div>${opp.quirks.map(q => `<span class="chip q">${E.QUIRKS[q].name}</span>`).join('') || '<span class="dim">No special tricks.</span>'}</div>
       <div class="dim" style="font-size:18px">${opp.quirks.map(q => E.QUIRKS[q].desc).join(' ')}</div>
+      ${opp.bossId ? bossPanel(opp.bossId, opp.pitchers[0]) : ''}
     </div>
     ${rewards}
     <div class="sec" id="shophead"><h2>SHOP</h2><button class="btn sm" id="reroll">REROLL $${2 + run.rerolls}</button></div>
@@ -640,6 +641,13 @@ function screenClub() {
   T.push(['club_lineup', 'Your lineup. Tap two players to swap them. Top of the order bats most, so stack your best hitters up there.', '#lineuphead']);
   T.push(['club_play', 'When you\'re set, play ball. Your progress saves after every at-bat.', '#play']);
   tips(T);
+}
+function bossPanel(id, ace) {
+  const B = E.BOSSES[id];
+  return `<div class="boss" id="bosspanel"><div class="row"><span class="bosstag">BOSS</span><h2 class="sp">${B.name}</h2></div>
+    <p class="bossline">${B.tag}</p>
+    ${ace ? `<div class="row" style="margin:6px 0"><img class="pt" src="${portrait(ace, '#1a1c2c')}" alt=""><div class="sp"><div class="bossace">${tierBadge(ace)}${ace.name}</div><div class="stats"><span>STF <b>${ace.stf}</b></span><span>CTL <b>${ace.ctl}</b></span><span>STA <b>${ace.sta}</b></span></div></div></div>` : ''}
+    <ul class="rules">${B.rules.map(r => `<li>${r}</li>`).join('')}</ul></div>`;
 }
 function itemCard(it, i, kind, free) {
   const attr = kind === 'rw' ? `data-rw="${i}"` : `data-shop="${i}"`;
@@ -723,7 +731,16 @@ function screenGame() {
   $('#set').onclick = () => { snd('click'); showSettings(true); };
   Field.mount(); Field.setColors(G.oppColors, G.usColors);
   updateBoard(G); Field.setState(G);
-  tips([['game_field', 'The sim plays itself. In the <span class="y">TOP</span> of each inning they bat. In the <span class="y">BOTTOM</span> you bat. Games are 6 innings. Under the field: who\'s up, who\'s pitching, and the pitcher\'s <span class="g">gas</span> bar.', '#fw']]).then(() => loop());
+  const intro = G.bossId && !G.bossIntro ? new Promise(res => {
+    G.bossIntro = true; saveRun();
+    snd('hr');
+    const m = modal(`<div class="center"><span class="bosstag">BOSS</span></div><div class="center big">${E.BOSSES[G.bossId].name}</div>
+      <p class="center" style="font-size:20px">The ${G.oppName} ${E.BOSSES[G.bossId].tag.toLowerCase().replace(/^they /, '')}</p>
+      ${bossPanel(G.bossId, G.t.opp.pitchers[0])}
+      <p class="dim" style="font-size:18px">Mix up your calls. Watch the red READ tags on every button.</p>
+      <button class="btn go" id="x">PLAY BALL</button>`, mm => { $('#x', mm).onclick = () => { snd('click'); closeModal(mm); res(); }; });
+  }) : Promise.resolve();
+  intro.then(() => tips([['game_field', 'The sim plays itself. In the <span class="y">TOP</span> of each inning they bat. In the <span class="y">BOTTOM</span> you bat. Games are 6 innings. Under the field: who\'s up, who\'s pitching, and the pitcher\'s <span class="g">gas</span> bar.', '#fw']])).then(() => loop());
 }
 function updateBoard(G) {
   $('#board').innerHTML = boardHTML(G);
@@ -764,21 +781,23 @@ function askDecision(G, pa) {
       const tired = !bat && pa.gas <= 0;
       let h = `<div class="panel"><div class="row"><h3 class="sp">${bat ? 'YOU ARE UP: ' + pa.batter.name : 'ON THE MOUND: ' + pa.pitcher.name}</h3>${pa.canClutch ? `<button class="btn sm ${clutch ? 'on' : ''}" id="cl">CLUTCH x${G.clutch}</button>` : '<span class="dim">NO CLUTCH</span>'}</div>
       <div class="dim" style="font-size:18px">${situation(G)}${tired ? ' <span class="r">ARM IS TIRED!</span>' : ''}</div>
-      <div class="${bat ? 'grid4' : 'grid4'}" style="${bat ? '' : 'grid-template-columns:repeat(3,1fr)'}">${keys.map(k => `<button class="btn ${k === 'normal' ? 'go' : ''}" data-a="${k}">${apprs[k].name}<small class="odds">${oddsText(odds[k])}</small></button>`).join('')}</div>`;
+      <div class="${bat ? 'grid4' : 'grid4'}" style="${bat ? '' : 'grid-template-columns:repeat(3,1fr)'}">${keys.map(k => { const rd = G.bossId ? E.readsOf(G, bat ? 'bat' : 'pit', k) : 0; return `<button class="btn ${k === 'normal' && !rd ? 'go' : ''} ${rd >= 3 ? 'warn' : ''}" data-a="${k}">${apprs[k].name}${rd && !clutch ? `<span class="read">READ ${rd}</span>` : ''}<small class="odds">${oddsText(odds[k])}</small></button>`; }).join('')}</div>`;
       const sp = [];
       if (bat) {
         if (pa.canSteal) sp.push(`<button class="btn" data-x="steal">STEAL ${pct(E.stealProb(G))}%<small>${G.bases[1] && !G.bases[2] ? 'to 3rd' : 'to 2nd'}</small></button>`);
+        if (pa.canSigns) sp.push(`<button class="btn gold" data-x="signs">CHANGE SIGNS<small>wipe every READ, once</small></button>`);
         if (pa.canBunt) sp.push(`<button class="btn" data-x="bunt">BUNT ${pct(E.buntProb(G))}%<small>move them up</small></button>`);
       } else {
         if (pa.canIBB) sp.push(`<button class="btn" data-x="ibb">WALK HIM<small>intentional</small></button>`);
         if (pa.canInfield) sp.push(`<button class="btn ${infield ? 'on' : ''}" data-x="inf">INFIELD IN<small>${infield ? 'ON: holds runner, +hits' : 'cut off the run'}</small></button>`);
+        if (pa.canSigns) sp.push(`<button class="btn gold" data-x="signs">CHANGE SIGNS<small>wipe every READ, once</small></button>`);
         if (nextP) sp.push(`<button class="btn ${tired ? 'warn' : ''}" data-x="pull">PULL ${nextP.name.split(' ')[1].slice(0, 7).toUpperCase()}<small>STF ${nextP.stf} CTL ${nextP.ctl}</small></button>`);
       }
       if (sp.length) h += `<div class="grid2">${sp.join('')}</div>`;
       h += '</div>';
       $('#panel').innerHTML = h;
       const cl = $('#cl'); if (cl) cl.onclick = () => { clutch = !clutch; snd('click'); render(); };
-      $$('[data-a]').forEach(b => b.onclick = () => { snd('click'); res(bat ? { type: 'swing', appr: b.dataset.a, clutch } : { type: 'pitch', appr: b.dataset.a, clutch, infield }); });
+      $$('[data-a]').forEach(b => b.onclick = () => { snd('click'); res(bat ? { type: 'swing', appr: b.dataset.a, clutch, chosen: true } : { type: 'pitch', appr: b.dataset.a, clutch, infield, chosen: true }); });
       $$('[data-x]').forEach(b => b.onclick = () => {
         const x = b.dataset.x; snd('click');
         if (x === 'inf') { infield = !infield; render(); return; }
@@ -795,6 +814,7 @@ function askDecision(G, pa) {
       T.push(['pitch', 'Now you\'re pitching. <span class="y">ATTACK</span> gets strikeouts but serves up homers. <span class="y">NIBBLE</span> avoids damage but walks guys.', '#panel']);
       if (pa.gas <= 0 && pa.canPull) T.push(['tired', 'Your pitcher is <span class="r">gassed</span>. Tired arms get crushed. <span class="y">PULL</span> brings in a fresh reliever. You only have two.', '[data-x="pull"]']);
     }
+    if (G.bossId) T.push(['boss', 'Boss rules: every call you repeat gets <span class="r">READ</span>. The tag and the odds on each button show it. Switch it up, save CLUTCH for big spots, and burn <span class="y">CHANGE SIGNS</span> when they have you figured out.', '#panel']);
     if (pa.canClutch) T.push(['clutch', '<span class="y">CLUTCH</span> is a one-shot boost. You get 3 a game. Tap it to arm it, then pick your play.', '#cl']);
     tips(T);
   });
@@ -807,7 +827,8 @@ const BANNER = {
 async function animate(G, ev) {
   const fast = settings.fast;
   let label = null, good = true, sound = 'out';
-  if (ev.type === 'steal') { label = ev.res === 'safe' ? 'SAFE!' : 'OUT!'; good = ev.res === 'safe'; sound = ev.res === 'safe' ? 'steal' : 'bad'; }
+  if (ev.type === 'signs') { label = 'NEW SIGNS'; good = true; sound = 'steal'; }
+  else if (ev.type === 'steal') { label = ev.res === 'safe' ? 'SAFE!' : 'OUT!'; good = ev.res === 'safe'; sound = ev.res === 'safe' ? 'steal' : 'bad'; }
   else if (ev.type === 'pa' || ev.type === 'bunt') {
     const b = BANNER[ev.code]; if (b) { label = b[0]; sound = b[1]; }
     if (ev.code === 'GO' && ev.outs === 2) label = 'DOUBLE PLAY';

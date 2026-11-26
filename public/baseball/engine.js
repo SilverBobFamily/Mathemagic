@@ -156,6 +156,22 @@ function makeSchedule(h, us) {
   return reg.concat(po, [pick(h, other)]);
 }
 const TOTAL_STAGES = 12;
+/* World Series boss. Its gimmick punishes predictable managing. */
+const BOSSES = {
+  signs: {
+    name: 'THE SIGN STEALERS',
+    tag: 'They read every call you make.',
+    rules: [
+      'Every time you call a play, they read it. Each READ on a batting call: about +3.5% strikeouts and -2.5% hits.',
+      'Each READ on a pitching call: their hitters get about +2.5% hits and more homers.',
+      'Call something different and every other play cools off by one READ. Max 4 READS per call.',
+      'CLUTCH can\'t be read. Once per game, CHANGE SIGNS wipes every READ.',
+      'Their ace is a Legendary arm. You call every pitch and every at-bat in this one.',
+    ],
+  },
+};
+const READ_CAP = 4;
+const readsOf = (G, kind, ap) => Math.min(READ_CAP, (G.reads && G.reads[kind] && G.reads[kind][ap]) || 0);
 const MODES = {
   season:   { name: 'SEASON',   desc: '12 games: 8 in your league, then 4 playoff rounds. Climb the Pressure ladder.' },
   daily:    { name: 'DAILY GAME', desc: 'Same city, rosters and twists for everyone today. One shot.' },
@@ -297,13 +313,14 @@ function oppFor(run) {
   const quirks = sample(h, Object.keys(QUIRKS), nq);
   const lift = endless ? Math.min(1, st / 30) : st / 24;
   TAKEN = new Set();
+  const bossId = (!endless && st === 11) || (endless && st % 10 === 9) ? 'signs' : null;
   const lineup = POS.map(() => genBatter(h, S, null, 0, rollTier(h, lift)));
-  const pitchers = [genPitcher(h, S + 3, 'sp', 0, rollTier(h, lift)), genPitcher(h, S, 'rp', 0, rollTier(h, lift)), genPitcher(h, S - 2, 'rp', 0, rollTier(h, lift))];
+  const pitchers = [genPitcher(h, S + (bossId ? -14 : 3), 'sp', 0, bossId ? 'L' : rollTier(h, lift)), genPitcher(h, S, 'rp', 0, rollTier(h, lift)), genPitcher(h, S - 2, 'rp', 0, rollTier(h, lift))];
   TAKEN = null;
   const T2 = TEAMS[run.team];
   const label = endless ? 'GAUNTLET ' + (st + 1) + (boss ? ' BOSS' : '') : stageLabel(run, st);
   const where = endless ? (T.lg + ' ' + T.div.toUpperCase()) : st < 8 ? (T.div === T2.div && T.lg === T2.lg ? T.lg + ' ' + T.div.toUpperCase() : LEAGUES[T.lg].toUpperCase()) : stageLabel(run, st);
-  return { stage: st, key, label, where, name: teamName(key), city: T.city, nick: T.nick, abbr: key, colors: T.colors, S, quirks, lineup, pitchers, boss };
+  return { stage: st, key, label, where, name: teamName(key), city: T.city, nick: T.nick, abbr: key, colors: T.colors, S, quirks, lineup, pitchers, boss, bossId };
 }
 
 /* ---------- events between games ---------- */
@@ -481,6 +498,7 @@ function newGame(run) {
     rs: hashSeed(run.seed, 5000 + run.stage * 17 + run.wins * 3 + run.losses),
     stage: run.stage, oppName: opp.name, oppNick: opp.nick, oppAbbr: opp.abbr, oppColors: opp.colors, oppLabel: opp.label, boss: opp.boss,
     usAbbr: run.team, usColors: TEAMS[run.team].colors,
+    bossId: opp.bossId || null, reads: { bat: {}, pit: {} }, signsUsed: false, bossIntro: false,
     inn: 1, half: 'top', outs: 0, bases: [null, null, null], score: { us: 0, opp: 0 }, line: { us: [], opp: [0] },
     len: cfgOf(run).gameLen, over: false, winner: null, walkoff: false,
     gm: { hr: cfgOf(run).hr, sta: cfgOf(run).sta, pow: cfgOf(run).pow, spd: cfgOf(run).spd, stf: cfgOf(run).stf },
@@ -562,6 +580,10 @@ function probs(G, side, o) {
     if (ap === 'attack') { k += 0.03; bb -= 0.03; hit += 0.02; hr *= 1.25; }
     if (ap === 'nibble') { k -= 0.015; bb += 0.06; hit -= 0.03; hr *= 0.75; }
     if (o.infield) hit += 0.04;
+  }
+  if (G.bossId === 'signs' && !o.clutch) {
+    if (side === 'us') { const r = readsOf(G, 'bat', ap); k += 0.035 * r; hit -= 0.025 * r; }
+    else { const r = readsOf(G, 'pit', ap); hit += 0.025 * r; hr *= 1 + 0.12 * r; }
   }
   const def = c.ft.lineup.reduce((a, q) => a + q.def, 0) / 9 + fm.def;
   const K = clamp(0.205 + (stf - con) / 260 + k, 0.05, 0.45);
@@ -731,6 +753,8 @@ function nextPA(G, settingsMode) {
     pa.canSteal = stealTarget(G) >= 0;
     pa.canBunt = (G.bases[0] || G.bases[1]) && !G.bases[2] && G.outs < 2;
     pa.canClutch = G.clutch > 0;
+    if (G.bossId && settingsMode !== 'auto') pa.decision = true;
+    pa.canSigns = G.bossId === 'signs' && !G.signsUsed && Object.values(G.reads.bat).concat(Object.values(G.reads.pit)).some(v => v > 0);
   } else {
     const runners = !!(G.bases[0] || G.bases[1] || G.bases[2]);
     const tired = pa.gas <= 0;
@@ -740,6 +764,8 @@ function nextPA(G, settingsMode) {
     pa.canInfield = !!G.bases[2] && G.outs < 2;
     pa.canClutch = G.clutch > 0;
     if (settingsMode === 'auto' && tired && pa.canPull && pa.gas < -2) pa.autoPull = true;
+    if (G.bossId && settingsMode !== 'auto') pa.decision = true;
+    pa.canSigns = G.bossId === 'signs' && !G.signsUsed && Object.values(G.reads.bat).concat(Object.values(G.reads.pit)).some(v => v > 0);
   }
   return pa;
 }
@@ -820,6 +846,13 @@ function resolve(G, pa, act) {
       const ev = { type: 'pull', again: true, text: 'Pitching change: ' + t.pitchers[t.pi].name + ' takes the mound.', runs: 0, outs: 0, side, batter: b, pitcher: t.pitchers[t.pi], score: { us: G.score.us, opp: G.score.opp }, basesNow: G.bases.slice(), outsNow: G.outs };
       return ev;
     }
+  }
+
+  if (act.type === 'signs' && G.bossId === 'signs' && !G.signsUsed) {
+    G.signsUsed = true; G.reads = { bat: {}, pit: {} };
+    const text = 'You change every sign. Their dugout is lost again.';
+    G.log.push(text);
+    return { type: 'signs', again: true, text, runs: 0, outs: 0, moves: [], side, batter: b, pitcher: p, score: { us: G.score.us, opp: G.score.opp }, basesNow: G.bases.slice(), outsNow: G.outs };
   }
 
   if (act.type === 'steal' && side === 'us') {
@@ -917,7 +950,16 @@ function resolve(G, pa, act) {
   if (code === 'FO' && r.runs && r.outs === 1) text = b.name + ' hits a sacrifice fly. Run scores!';
   if (mull) text = 'MULLIGAN! ' + text;
   const ball = code === 'K' ? 'k' : code === 'BB' ? 'bb' : code === 'HR' ? 'hr' : code === 'GO' ? 'go' : code === 'FO' ? 'fo' : code === '1B' ? 'single' : code === '2B' ? 'double' : 'triple';
-  const ev = { type: 'pa', code, text, runs: r.runs, outs: r.outs, moves: r.moves, ball, mulligan: mull, clutch: o.clutch, appr: o.appr, prob: { K: pr.K, BB: pr.BB, H: pr.pHit, HR: pr.pHR } };
+  let read = 0;
+  if (G.bossId === 'signs' && act.chosen && !o.clutch) {
+    const kind = side === 'us' ? 'bat' : 'pit', R = G.reads[kind];
+    Object.keys(side === 'us' ? APPR_BAT : APPR_PIT).forEach(a => { if (a !== o.appr && R[a]) R[a] = Math.max(0, R[a] - 1); });
+    R[o.appr] = Math.min(READ_CAP, (R[o.appr] || 0) + 1);
+    read = R[o.appr];
+    const nm = (side === 'us' ? APPR_BAT : APPR_PIT)[o.appr].name;
+    if (read >= 2) text += ' They\'re reading ' + nm + ' (' + read + ').';
+  }
+  const ev = { type: 'pa', code, text, runs: r.runs, outs: r.outs, moves: r.moves, ball, mulligan: mull, clutch: o.clutch, appr: o.appr, read, prob: { K: pr.K, BB: pr.BB, H: pr.pHit, HR: pr.pHR } };
   return finishPA(G, side, ev, b, p, true);
 }
 
@@ -958,6 +1000,7 @@ function allPlayers() {
 }
 
 const api = {
+  BOSSES, READ_CAP, readsOf,
   TEAMS, LEAGUES, teamName, stageLabel, TIERS, MODES, PRESSURE, DAILY_MODS, EVENTS, buildCfg, dailyInfo, eventChoices, resolveEvent, maxLosses, totalStages, allPlayers, rollTier,
   RELICS, QUIRKS, TRAINING, ARCH, BAT_TRAITS, PIT_TRAITS, APPR_BAT, APPR_PIT, POS, STAGE_LABELS, TOTAL_STAGES, MAX_LOSSES, GAME_LEN,
   newDraft, startRun, oppFor, makeShop, makeRewards, rerollShop, placePlayer, applyTraining, addRelic, playerAt, finishGame,
