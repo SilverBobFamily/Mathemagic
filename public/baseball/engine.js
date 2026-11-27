@@ -62,7 +62,7 @@ const PIT_TRAITS = {
   fireball:  { name: 'Fireball',  desc: '+4% strikeouts' },
   sinker:    { name: 'Sinker',    desc: 'More double plays, fewer homers' },
   workhorse: { name: 'Workhorse', desc: '+4 stamina' },
-  closer:    { name: 'Closer',    desc: '+10 STUFF from the 5th inning on' },
+  closer:    { name: 'Closer',    desc: '+10 STUFF in the 9th inning and later' },
 };
 
 const RELICS = {
@@ -78,7 +78,7 @@ const RELICS = {
   bullpen_cart:{ name: 'Bullpen Cart',    price: 6, desc: 'Relievers: +10 STUFF, +4 stamina.',        fx: (m, r, x) => { if (r === 'pit' && x.pitcher.kind === 'rp') m.stf += 10; } },
   launch:      { name: 'Launch Angle',    price: 6, desc: '+8 POW, -3 CON for every hitter.',         fx: (m, r) => { if (r === 'bat') { m.pow += 8; m.con -= 3; } } },
   mulligan:    { name: 'Mulligan Glove',  price: 7, desc: 'Once a game, re-roll an out with a runner in scoring position.' },
-  stretch:     { name: '7th Inn. Stretch',price: 7, desc: '+6 CON/POW/EYE from the 5th inning on.',   fx: (m, r, x) => { if (r === 'bat' && x.inn >= 5) { m.con += 6; m.pow += 6; m.eye += 6; } } },
+  stretch:     { name: '7th Inn. Stretch',price: 7, desc: '+6 CON/POW/EYE in the 8th inning and later.', fx: (m, r, x) => { if (r === 'bat' && x.inn >= 8) { m.con += 6; m.pow += 6; m.eye += 6; } } },
   cleats:      { name: 'Spiked Cleats',   price: 5, desc: '+10 SPD for every runner.',                fx: (m, r) => { if (r === 'bat') m.spd += 10; } },
   scouting:    { name: 'Scouting Report', price: 6, desc: 'Enemy pitchers: -5 STUFF.',                fx: (m, r) => { if (r === 'bat') m.oppStf -= 5; } },
   rosin:       { name: 'Rosin Bag',       price: 5, desc: '+6 CTL for your pitchers.',                fx: (m, r) => { if (r === 'pit') m.ctl += 6; } },
@@ -304,7 +304,7 @@ const DAILY_MODS = {
   deadarms: { name: 'Dead Arms',           desc: 'Every pitcher -4 stamina.' },
   bandbox:  { name: 'Bandbox Parks',       desc: '+8 POW for every hitter.' },
   smallmkt: { name: 'Small Market',        desc: 'Start with $0, +2 gold per win.' },
-  quick:    { name: 'Rain-Shortened',      desc: 'Games are 5 innings.' },
+  quick:    { name: 'Rain-Shortened',      desc: 'Games start in the 8th: just 2 innings.' },
   deep:     { name: 'Deep Pockets',        desc: 'Start with $12, shop prices +1.' },
   oldtimers:{ name: 'Old-Timers Day',      desc: 'Legends show up 3x as often.' },
   speedway: { name: 'Speedway',            desc: '+12 SPD for every runner.' },
@@ -313,7 +313,7 @@ const DAILY_MODS = {
 function buildCfg(mode, pressure, dmods, perks) {
   const P = mode === 'season' ? (pressure || 0) : 0;
   const c = { oppBoost: 0, startGold: 3, priceUp: 0, extraQuirk: 0, clutch: 3, rewardN: 3, maxLosses: 3, wsBoost: 0,
-    hr: 1, sta: 0, pow: 0, spd: 0, stf: 0, gameLen: GAME_LEN, winGold: 0, legendX: 1,
+    hr: 1, sta: 0, pow: 0, spd: 0, stf: 0, gameLen: GAME_LEN, startInn: START_INN, winGold: 0, legendX: 1,
     relicPack: 0, shopBonus: 0, rpStf: 0, slotBonus: 0, scoutLift: 0, startPlays: [] };
   // daily runs are the same for everyone: no perks, full relic pool, full playbook
   const pk = mode === 'daily' || mode === 'seeded' ? null : (perks || []);
@@ -342,7 +342,7 @@ function buildCfg(mode, pressure, dmods, perks) {
     if (m === 'deadarms') c.sta -= 4;
     if (m === 'bandbox') c.pow += 8;
     if (m === 'smallmkt') { c.startGold = 0; c.winGold += 2; }
-    if (m === 'quick') c.gameLen = 5;
+    if (m === 'quick') c.startInn = 8;
     if (m === 'deep') { c.startGold = 12; c.priceUp += 1; }
     if (m === 'oldtimers') c.legendX = 3;
     if (m === 'speedway') c.spd += 12;
@@ -359,7 +359,9 @@ function dailyInfo(dateKey) {
 const cfgOf = run => run.cfg || buildCfg('season', 0, []);
 const isEndless = run => run.mode === 'gauntlet';
 const MAX_LOSSES = 3;
-const GAME_LEN = 6;
+/* Every game picks up in the top of the 7th, scoreless through 6: three innings to win it. */
+const GAME_LEN = 9;
+const START_INN = 7;
 
 /* ---------- players ---------- */
 const newId = h => 'p' + Math.floor(rf(h) * 1e9).toString(36);
@@ -711,7 +713,8 @@ function newGame(run) {
     usAbbr: run.team, usColors: TEAMS[run.team].colors,
     plays: run.plays ? run.plays.slice() : null, rpStf: cfgOf(run).rpStf || 0,
     bossId: opp.bossId || null, reads: { bat: {}, pit: {} }, signsUsed: false, bossIntro: false,
-    inn: 1, half: 'top', outs: 0, bases: [null, null, null], score: { us: 0, opp: 0 }, line: { us: [], opp: [0] },
+    inn: cfgOf(run).startInn || START_INN, half: 'top', outs: 0, bases: [null, null, null], score: { us: 0, opp: 0 },
+    line: { us: Array((cfgOf(run).startInn || START_INN) - 1).fill(0), opp: Array((cfgOf(run).startInn || START_INN) - 1).fill(0) },
     len: cfgOf(run).gameLen, over: false, winner: null, walkoff: false,
     gm: { hr: cfgOf(run).hr, sta: cfgOf(run).sta, pow: cfgOf(run).pow, spd: cfgOf(run).spd, stf: cfgOf(run).stf },
     clutch: cfgOf(run).clutch + (run.clutchBonus || 0) + (run.relics.includes('seeds') ? 2 : 0), used: {},
@@ -723,6 +726,13 @@ function newGame(run) {
     stats: { hr: 0, runs: 0, steals: 0, k: 0 },
   };
   run.nextQuirk = 0;
+  // six innings already happened: starters are tired, and the order is somewhere mid-lineup
+  const hp = { rs: hashSeed(G.rs, 61) };
+  ['us', 'opp'].forEach(k => {
+    const t = G.t[k], sp = t.pitchers[0];
+    t.bf[sp.id] = Math.max(0, sp.sta + (sp.trait === 'workhorse' ? 4 : 0) - ri(hp, 2, 6));
+    t.idx = ri(hp, 0, 8);
+  });
   startHalf(G);
   return G;
 }
@@ -778,7 +788,7 @@ function probs(G, side, o) {
   const gas = gasOf(G, c.oth, p);
   const fat = gas < 0 ? -gas * 3.5 : 0;
   let stf = p.stf + fm.stf + bm.oppStf - fat, ctl = p.ctl + fm.ctl - fat * 0.8;
-  if (p.trait === 'closer' && G.inn >= 5) stf += 10;
+  if (p.trait === 'closer' && G.inn >= 9) stf += 10;
   if (p.trait === 'fireball') k += 0.04;
   if (p.trait === 'sinker') hr *= 0.8;
   if (o.clutch) {
@@ -941,7 +951,7 @@ function oppAI(G) {
   const p = t.pitchers[t.pi];
   if (t.pi < t.pitchers.length - 1) {
     const gas = gasOf(G, 'opp', p);
-    if (gas <= 0 || (p.kind === 'sp' && G.inn >= 5 && gas <= 3)) {
+    if (gas <= 0 || (p.kind === 'sp' && G.inn >= 8 && gas <= 2)) {
       t.pi++;
       return { type: 'pull', text: 'The ' + (G.oppNick || G.oppName) + ' bring in ' + t.pitchers[t.pi].name + '.', again: true, side: 'us', runs: 0, outs: 0, score: { us: G.score.us, opp: G.score.opp }, basesNow: G.bases.slice(), outsNow: G.outs };
     }
