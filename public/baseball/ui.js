@@ -14,6 +14,12 @@ const store = {
 let settings = Object.assign({ mode: 'key', sound: true, fast: false }, store.get('pinetar.set', {}));
 let meta = Object.assign({ runs: 0, best: 0, titles: 0, bestWins: 0, onboarded: false, tips: {}, tipsOff: false, lastTeam: null, hof: {}, pressure: 0, daily: {}, gauntletBest: 0 }, store.get('pinetar.meta', {}));
 const saveMeta = () => store.set('pinetar.meta', meta);
+/* Front Office: owned unlocks + Fans. Players from before this update get Fans for the runs they already played. */
+if (meta.fans == null) { meta.fans = meta.runs * 25 + meta.titles * 100; meta.fo = []; }
+meta.fo = meta.fo || [];
+if (meta.best >= 9 && !meta.fo.includes('gauntlet')) meta.fo.push('gauntlet');
+const owns = id => meta.fo.includes(id);
+const perks = () => meta.fo.slice();
 let pendingTeam = null;
 /* drop saves from before the MLB-cities update */
 (function () { const r = store.get('pinetar.run', null); if (r && !(r.v >= 2)) store.del('pinetar.run'); })();
@@ -37,7 +43,7 @@ function saveRun(quiet) {
 }
 function runLabel(r) {
   const T = E.TEAMS[r.team] || { nick: '?' };
-  const m = r.mode === 'gauntlet' ? 'GAUNTLET' : r.mode === 'daily' ? 'DAILY' : (r.pressure ? 'P' + r.pressure + ' SEASON' : 'SEASON');
+  const m = r.mode === 'season' || !r.mode ? (r.pressure ? 'P' + r.pressure + ' SEASON' : 'SEASON') : (E.MODES[r.mode] ? E.MODES[r.mode].name : 'SEASON');
   const where = r.done ? 'FINAL' : r.mode === 'gauntlet' ? 'GAME ' + (r.stage + 1) : E.stageLabel(r, Math.min(r.stage, 11));
   return `${T.nick} &middot; ${m} &middot; ${where} &middot; ${r.wins}-${r.losses}`;
 }
@@ -344,6 +350,7 @@ function screenTitle() {
     <div class="row" style="flex-direction:column;gap:12px;width:100%;align-items:center">
       ${has ? `<button class="btn go" id="b-cont">CONTINUE<small>${runLabel(sv)}</small><small>autosaved ${ago(sv.savedAt)}</small></button>` : ''}
       <button class="btn ${has ? '' : 'go'}" id="b-new">${meta.onboarded ? 'NEW RUN' : 'PLAY BALL'}</button>
+      <button class="btn gold" id="b-fo">FRONT OFFICE<small>${meta.fans} fans to spend</small></button>
       <button class="btn" id="b-hof">HALL OF FAME</button>
       <button class="btn" id="b-help">HOW TO PLAY</button>
       <button class="btn" id="b-set">SETTINGS</button>
@@ -352,6 +359,7 @@ function screenTitle() {
   </div>`);
   $('#b-new').onclick = () => { snd('click'); if (has && !confirmNew) { confirmNew = true; $('#b-new').textContent = 'TAP AGAIN: ERASE RUN'; $('#b-new').classList.add('warn'); return; } confirmNew = false; store.del('pinetar.run'); run = null; if (!meta.onboarded) screenIntro(0); else screenModes(); };
   $('#b-hof').onclick = () => { snd('click'); screenHof(); };
+  $('#b-fo').onclick = () => { snd('click'); screenFrontOffice(); };
   if (has) $('#b-cont').onclick = () => { snd('click'); run = store.get('pinetar.run', null); if (!run) return screenTitle(); resume(); };
   $('#b-help').onclick = () => { snd('click'); showHelp(); };
   $('#b-set').onclick = () => { snd('click'); showSettings(); };
@@ -360,7 +368,9 @@ let confirmNew = false;
 
 function showHelp() {
   modal(`<h2>HOW TO PLAY</h2><div class="help">
-  <p><span class="y">MODES:</span> SEASON is 12 games ending in the World Series. Win one to unlock the next PRESSURE level (8 total). DAILY GAME is the same city, roster and twists for everyone, once a day. GAUNTLET is endless.</p>
+  <p><span class="y">START SMALL:</span> every run starts with a thin PLAYBOOK (NORMAL, CONTACT, POWER at bat; NORMAL, ATTACK on the mound) and 2 relic slots. Buy STEAL, BUNT, TAKE, NIBBLE, FOUR WIDE and INFIELD IN cards in the shop. You get one more relic slot every 3 wins.</p>
+  <p><span class="y">FRONT OFFICE:</span> every run earns Fans, win or lose. Spend them on new modes (Daily, Draft Day, Franchise Legends, Trade Desk, Gauntlet), relic packs and permanent perks.</p>
+  <p><span class="y">SEASON:</span> 12 games ending in the World Series against the Sign Stealers. Win one to unlock the next PRESSURE level (8 total).</p>
   <p>Lose ${E.MAX_LOSSES} games and the run ends.</p>
   <p><span class="y">GAMES</span> are 6 innings. The sim runs itself. When runners are on, it stops and YOU call the play.</p>
   <p><span class="y">AT BAT:</span> pick an approach (contact, power, patient), steal, or bunt. <span class="y">PITCHING:</span> attack, nibble, walk a guy, or change pitchers before your arm tires.</p>
@@ -407,7 +417,7 @@ const INTRO = [
   { h: 'WELCOME, SKIPPER', t: 'I\'m Coach Sparky. You run the ballclub. The players play. You make the calls that win or lose it.', art: 'field' },
   { h: 'ONE SEASON PER RUN', t: '8 games against your league. Then the playoffs: Wild Card, Division Series, League Championship, World Series. Lose 3 games and you\'re fired.', art: 'season' },
   { h: 'CALL THE PLAY', t: 'When runners get on, the sim stops and asks you. Swing for power, bunt, steal, yank your pitcher. Every button shows the real odds.', art: 'odds' },
-  { h: 'BUILD A MONSTER', t: 'Win games, earn gold. Buy relics, sign free agents, train your guys. No two runs play the same.', art: 'relics' },
+  { h: 'START SMALL, GET BIG', t: 'You start with a thin playbook and 2 relic slots. Win games, earn gold, buy new signs, relics and free agents. Every run earns Fans to unlock new modes in the Front Office.', art: 'relics' },
 ];
 function introArt(kind) {
   if (kind === 'field') return `<img class="ballbig" src="${ballIcon()}" alt="">`;
@@ -440,7 +450,12 @@ function screenTeams() {
     <p class="dim">Your city sets your league, your division rivals and your colors.</p>
     ${groups.map(g => `<h3 style="margin-top:4px">${g.lg} ${g.div.toUpperCase()}</h3><div class="teams">${g.keys.map(k => { const T = E.TEAMS[k]; return `<button class="team ${meta.lastTeam === k ? 'last' : ''}" data-t="${k}"><span class="sw" style="background:${T.colors[0]};border-color:${T.colors[1]}"></span><span class="tn"><span class="dim">${T.city}</span><br>${T.nick}</span></button>`; }).join('')}</div>`).join('')}
   </div>`);
-  $$('[data-t]').forEach(b => b.onclick = () => { snd('buy'); pendingTeam = b.dataset.t; meta.lastTeam = pendingTeam; saveMeta(); newDraft(); });
+  $$('[data-t]').forEach(b => b.onclick = () => {
+    snd('buy'); pendingTeam = b.dataset.t; meta.lastTeam = pendingTeam; saveMeta();
+    if (pendingMode.mode === 'draft') startDraftDay();
+    else if (pendingMode.mode === 'franchise') screenFranchise();
+    else newDraft();
+  });
   $('#back').onclick = () => { snd('click'); screenModes(); };
   tips([['teams', 'Pick any club. Your city sets your schedule: division rivals first, then the rest of your league, then the playoffs.', '.teams']]);
 }
@@ -475,7 +490,8 @@ let pressSel = null;
 function screenModes() {
   if (pressSel == null) pressSel = meta.pressure;
   const today = todayKey(), di = E.dailyInfo(today), dd = meta.daily[today];
-  const gUnlocked = meta.best >= 9 || meta.titles > 0;
+  const gUnlocked = owns('gauntlet');
+  const lockedCard = (k) => { const it = E.FRONT_OFFICE.find(x => x.id === k); return `<div class="d r">Locked. Unlock in the Front Office for ${it.cost} fans.</div><button class="btn gold" data-fo="1">FRONT OFFICE (${meta.fans} fans)</button>`; };
   const P = E.PRESSURE;
   mount(`<div class="screen">
     <div class="top"><h2 class="sp">CHOOSE A MODE</h2><button class="btn sm" id="back">BACK</button></div>
@@ -486,29 +502,91 @@ function screenModes() {
       <div class="d"><span class="y">${P[pressSel].name}:</span> ${pressSel ? P.slice(1, pressSel + 1).map(x => x.desc).join(' ') : P[0].desc}${meta.pressure < 8 ? ` <span class="dim">Win at Pressure ${meta.pressure} to unlock ${meta.pressure + 1}.</span>` : ''}</div>
       <button class="btn go" id="go-season">START SEASON</button>
     </div>
+    <div class="px mode" id="m-code">
+      <h2>ENTER A CODE</h2><div class="d">Same code, same game: city, rosters, schedule, shops. Share one with a friend and compare. Try <span class="y">jooz</span>.</div>
+      <div class="row"><input id="code" class="codein" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type a code" aria-label="Game code"><button class="btn go" id="go-code">GO</button></div>
+    </div>
     <div class="px mode" id="m-daily">
       <h2>${E.MODES.daily.name}</h2><div class="d">${E.MODES.daily.desc}</div>
       <div class="d">Today: <span class="y">${E.teamName(di.team)}</span></div>
       <div>${di.dmods.map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('')}</div>
       <div class="d">${di.dmods.map(k => E.DAILY_MODS[k].desc).join(' ')}</div>
       ${dd ? `<div class="d g">${dd.done ? `Today's result: ${dd.wins}-${dd.losses}${dd.champ ? ', CHAMPIONS' : ''}. Back tomorrow.` : 'Started. Finish it from CONTINUE on the title screen.'}</div>` : ''}
-      <button class="btn ${dd ? '' : 'go'}" id="go-daily" ${dd ? 'disabled' : ''}>PLAY TODAY</button>
+      ${owns('daily') ? `<button class="btn ${dd ? '' : 'go'}" id="go-daily" ${dd ? 'disabled' : ''}>PLAY TODAY</button>` : lockedCard('daily')}
     </div>
     <div class="px mode ${gUnlocked ? '' : 'locked'}" id="m-gauntlet">
       <h2>${E.MODES.gauntlet.name}</h2><div class="d">${E.MODES.gauntlet.desc}</div>
-      <div class="d">${gUnlocked ? 'Best: <span class="y">' + meta.gauntletBest + ' wins</span>' : 'Locked. Reach the playoffs in a Season to unlock.'}</div>
-      <button class="btn ${gUnlocked ? 'go' : ''}" id="go-gauntlet" ${gUnlocked ? '' : 'disabled'}>START GAUNTLET</button>
+      ${gUnlocked ? `<div class="d">Best: <span class="y">${meta.gauntletBest} wins</span></div><button class="btn go" id="go-gauntlet">START GAUNTLET</button>` : '<div class="d dim">Unlocks free when you reach the playoffs.</div>' + lockedCard('gauntlet')}
     </div>
+    ${['draft', 'franchise', 'trade'].map(k => `<div class="px mode ${owns(k) ? '' : 'locked'}" id="m-${k}"><h2>${E.MODES[k].name}</h2><div class="d">${E.MODES[k].desc}</div>${owns(k) ? `<button class="btn go" id="go-${k}">START ${E.MODES[k].name}</button>` : lockedCard(k)}</div>`).join('')}
   </div>`);
+  ['draft', 'franchise', 'trade'].forEach(k => { const b = $('#go-' + k); if (b) b.onclick = () => { snd('click'); pendingMode = { mode: k, seed: null }; screenTeams(); }; });
+  $$('[data-fo]').forEach(b => b.onclick = () => { snd('click'); screenFrontOffice(true); });
+  const goCode = () => {
+    const info = E.codeInfo($('#code').value);
+    if (!info) { snd('bad'); $('#code').focus(); return; }
+    snd('click');
+    pendingMode = { mode: 'seeded', seed: info.seed, code: info.code };
+    pendingTeam = info.team;
+    if (info.known) screenSeedPreview(info); else newDraft();
+  };
+  $('#go-code').onclick = goCode;
+  $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') goCode(); });
   $('#back').onclick = () => { snd('click'); screenTitle(); };
   $$('[data-p]').forEach(b => b.onclick = () => { pressSel = +b.dataset.p; snd('click'); const y = $('.screen').scrollTop; screenModes(); $('.screen').scrollTop = y; });
-  $('#go-season').onclick = () => { snd('click'); pendingMode = { mode: 'season', pressure: pressSel }; screenTeams(); };
-  $('#go-daily').onclick = () => {
+  $('#go-season').onclick = () => { snd('click'); pendingMode = { mode: 'season', pressure: pressSel, seed: null }; screenTeams(); };
+  if ($('#go-daily')) $('#go-daily').onclick = () => {
     snd('click'); pendingMode = { mode: 'daily', dmods: di.dmods, dateKey: today, seed: di.seed };
     pendingTeam = di.team; newDraft();
   };
-  $('#go-gauntlet').onclick = () => { snd('click'); pendingMode = { mode: 'gauntlet' }; screenTeams(); };
+  if ($('#go-gauntlet')) $('#go-gauntlet').onclick = () => { snd('click'); pendingMode = { mode: 'gauntlet', seed: null }; screenTeams(); };
   tips([['modes', 'Start with a <span class="y">SEASON</span>. Win one and you unlock <span class="y">PRESSURE</span> levels, each one harder. The <span class="y">DAILY GAME</span> is a fresh challenge every day.', '#m-season']]);
+}
+
+/* ---------- code games ---------- */
+function screenSeedPreview(info) {
+  const K = info.known, team = E.makeSeedTeam(info.code), T = E.TEAMS[info.team];
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">CODE: ${info.code.toUpperCase()}</h2><button class="btn sm" id="back">BACK</button></div>
+    <div class="px hl"><h2>${K.title}</h2><p class="dim" style="font-size:18px;margin-top:6px">${K.desc}</p>
+      <p style="font-size:18px;margin-top:6px">Playing as the <span class="y">${E.teamName(info.team)}</span>. Starting relic: <span class="y">${E.RELICS[K.relic].name}</span>.</p></div>
+    <h3>STARTING LINEUP</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.lineup.map((p, i) => playerRow(p, team.positions[i])).join('')}</div>
+    <h3>PITCHING STAFF</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.pitchers.map((p, i) => playerRow(p, i === 0 ? 'SP' : 'RP')).join('')}</div>
+    <h3>STILL OUT THERE (${team.pool.length})</h3>
+    <div class="hof">${team.pool.map(n => `<span class="tier-${(E.TIERS && window.PT_PLAYERS.WHO[n] ? window.PT_PLAYERS.WHO[n].tier : 'C')}">${n}</span>`).join('')}</div>
+    <div class="sticky"><button class="btn go" style="width:100%" id="ok">PLAY BALL</button></div>
+  </div>`);
+  $('#back').onclick = () => { snd('click'); screenModes(); };
+  $('#ok').onclick = () => {
+    snd('buy');
+    run = E.startRun({ key: 'custom', team: { lineup: team.lineup, pitchers: team.pitchers }, relic: team.relic }, info.seed, info.team,
+      { mode: 'seeded', code: info.code, namePool: team.pool });
+    collectRoster(); saveRun(); backupRun(); screenClub();
+  };
+}
+
+/* ---------- front office ---------- */
+function screenFrontOffice(fromModes) {
+  const items = E.FRONT_OFFICE;
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">FRONT OFFICE</h2><span class="gold">${meta.fans} FANS</span><button class="btn sm" id="back">BACK</button></div>
+    <p class="dim" style="font-size:18px">Every run earns Fans, win or lose. Spend them on permanent upgrades. Your club starts small and grows.</p>
+    ${items.map(it => {
+      const have = owns(it.id), blocked = it.req && !owns(it.req), afford = meta.fans >= it.cost;
+      return `<div class="px fo ${have ? 'own' : ''}"><div class="row"><h3 class="sp">${it.name.toUpperCase()}${it.mode ? ' <span class="chip m">MODE</span>' : ''}</h3>${have ? '<span class="g" style="font-size:20px">OWNED</span>' : `<span class="gold">${it.cost}</span>`}</div>
+        <div class="d">${it.desc}${blocked ? ` <span class="r">Needs ${items.find(x => x.id === it.req).name} first.</span>` : ''}</div>
+        ${have ? '' : `<button class="btn ${afford && !blocked ? 'go' : ''}" data-buy="${it.id}" ${afford && !blocked ? '' : 'disabled'}>${afford ? 'UNLOCK' : 'NEED ' + (it.cost - meta.fans) + ' MORE FANS'}</button>`}</div>`;
+    }).join('')}
+  </div>`);
+  $('#back').onclick = () => { snd('click'); fromModes ? screenModes() : screenTitle(); };
+  $$('[data-buy]').forEach(b => b.onclick = () => {
+    const it = items.find(x => x.id === b.dataset.buy);
+    if (!it || owns(it.id) || meta.fans < it.cost) return;
+    meta.fans -= it.cost; meta.fo.push(it.id); saveMeta(); snd('win');
+    const y = $('.screen').scrollTop; screenFrontOffice(fromModes); $('.screen').scrollTop = y;
+  });
 }
 
 /* ---------- clubhouse events ---------- */
@@ -554,36 +632,142 @@ function screenHof() {
   $('#back').onclick = () => { snd('click'); screenTitle(); };
 }
 
+/* ---------- draft day ---------- */
+let dd = null;
+function startDraftDay() { dd = { seed: (Math.random() * 2 ** 31) | 0, round: 0, picks: [] }; screenDraftDay(); }
+function screenDraftDay() {
+  const rd = E.draftRound(dd.seed, dd.round, dd.picks.map(p => p.name));
+  const slotName = { C: 'CATCHER', '1B': 'FIRST BASE', '2B': 'SECOND BASE', '3B': 'THIRD BASE', SS: 'SHORTSTOP', LF: 'LEFT FIELD', CF: 'CENTER FIELD', RF: 'RIGHT FIELD', DH: 'DESIGNATED HITTER', SP: 'STARTING PITCHER', RP: 'RELIEF PITCHER' }[rd.slot];
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">DRAFT DAY</h2><span class="gold">${dd.round + 1}/12</span><button class="btn sm" id="back">QUIT</button></div>
+    <div class="px hl"><h3>ROUND ${dd.round + 1}: ${slotName}</h3><p class="dim" style="font-size:18px;margin-top:4px">${E.teamName(pendingTeam)} are on the clock. Pick one.</p></div>
+    <div style="display:flex;flex-direction:column;gap:8px">${rd.options.map((p, i) => `<div data-dp="${i}" style="cursor:pointer">${playerRow(p, rd.slot)}</div>`).join('')}</div>
+    ${dd.picks.length ? `<h3>YOUR PICKS</h3><div class="hof">${dd.picks.map((p, i) => `<span class="tier-${p.tier || 'C'}">${E.DRAFT_SLOTS[i]} ${p.name}</span>`).join('')}</div>` : ''}
+  </div>`);
+  $$('[data-dp]').forEach(b => b.onclick = () => {
+    snd('buy'); dd.picks.push(rd.options[+b.dataset.dp]); dd.round++;
+    if (dd.round >= 12) { const lineup = dd.picks.slice(0, 9), pitchers = dd.picks.slice(9); screenRelicPick({ lineup, pitchers }, dd.seed, 'Draft complete. Pick a starting relic.'); }
+    else screenDraftDay();
+  });
+  $('#back').onclick = () => { snd('click'); screenModes(); };
+  tips([['draftday', 'Draft Day: 12 rounds, one position per round. Rarer players have better stats, but a great Common can beat a bad Rare. Watch the overall number on the right.', '[data-dp="0"]']]);
+}
+
+/* ---------- franchise legends ---------- */
+function screenFranchise() {
+  const seed = (Math.random() * 2 ** 31) | 0;
+  const team = E.makeFranchiseTeam(seed, pendingTeam);
+  const T = E.TEAMS[pendingTeam];
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">${T.nick.toUpperCase()} LEGENDS</h2><button class="btn sm" id="back">BACK</button></div>
+    <p class="dim" style="font-size:18px">The ${E.teamName(pendingTeam)} all-time greats, reunited. They're a step slower than they used to be.</p>
+    <h3>LINEUP</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.lineup.map((p, i) => playerRow(p, E.POS[i])).join('')}</div>
+    <h3>PITCHING STAFF</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.pitchers.map((p, i) => playerRow(p, i === 0 ? 'SP' : 'RP')).join('')}</div>
+    <div class="grid2"><button class="btn" id="again">SHUFFLE LEGENDS</button><button class="btn go" id="ok">SIGN THEM</button></div>
+  </div>`);
+  $('#back').onclick = () => { snd('click'); screenTeams(); };
+  $('#again').onclick = () => { snd('click'); screenFranchise(); };
+  $('#ok').onclick = () => { snd('buy'); screenRelicPick(team, seed, 'Pick a starting relic for the old-timers.'); };
+}
+
+/* ---------- starting relic pick (draft day, franchise) ---------- */
+function screenRelicPick(team, seed, line) {
+  const choices = E.relicChoices(seed, E.buildCfg('season', 0, [], perks()).relicPack);
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">STARTING RELIC</h2></div>
+    <p class="dim" style="font-size:18px">${line}</p>
+    ${choices.map(id => `<button class="btn" data-r="${id}">${E.RELICS[id].name}<small>${E.RELICS[id].desc}</small></button>`).join('')}
+  </div>`);
+  $$('[data-r]').forEach(b => b.onclick = () => {
+    snd('buy');
+    run = E.startRun({ key: 'custom', team, relic: b.dataset.r }, seed, pendingTeam, Object.assign({}, pendingMode, { perks: perks() }));
+    collectRoster(); saveRun(); backupRun(); screenClub();
+  });
+}
+
+/* ---------- trade desk ---------- */
+function tradeDeskHTML(opp) {
+  if (run.mode !== 'trade') return '';
+  const offers = (run.trades || []).map((o, i) => {
+    const mine = E.playerAt(run, o.slot);
+    if (o.done || !mine || mine.id !== o.give) return '';
+    const T = E.TEAMS[o.team];
+    return `<div class="px trade"><div class="row"><span class="tsw" style="background:${T.colors[0]};border-color:${T.colors[1]}"></span><h3 class="sp">${T.city.toUpperCase()} ${T.nick.toUpperCase()} CALL</h3></div>
+      <div class="tlabel r">YOU GIVE</div>${playerRow(mine, o.slot < 9 ? E.POS[o.slot] : (o.slot === 9 ? 'SP' : 'RP'))}
+      <div class="tlabel g">YOU GET${o.gold ? ' + $' + o.gold : ''}</div>${playerRow(o.get, o.slot < 9 ? E.POS[o.slot] : (o.slot === 9 ? 'SP' : 'RP'))}
+      <div class="grid2"><button class="btn" data-tno="${i}">PASS</button><button class="btn go" data-tyes="${i}">ACCEPT</button></div></div>`;
+  }).join('');
+  const used = run.oppTraded === run.stage;
+  return `<div class="sec" id="tradehead"><h2>TRADE DESK</h2></div>
+    ${offers || '<p class="dim" style="font-size:18px">No calls right now. More come after every game.</p>'}
+    <div class="px"><h3>POACH FROM THE ${opp.nick.toUpperCase()}</h3><p class="dim" style="font-size:18px;margin:4px 0 8px">Trade with your next opponent. Their best guy plays for you, and your guy plays for them. One deal per game.</p>
+    <button class="btn ${used ? '' : 'gold'}" id="poach" ${used ? 'disabled' : ''}>${used ? 'DEAL DONE THIS ROUND' : 'MAKE AN OFFER'}</button></div>`;
+}
+function poachFlow() {
+  const opp = E.oppFor(run);
+  const theirs = opp.lineup.map((p, i) => ({ p, idx: i, pos: E.POS[i] })).concat(opp.pitchers.map((p, i) => ({ p, idx: 9 + i, pos: i === 0 ? 'SP' : 'RP' })));
+  const m = modal(`<h2>WHO DO YOU WANT?</h2><p class="dim">From the ${opp.name}:</p><div style="display:flex;flex-direction:column;gap:5px">${theirs.map(x => `<div data-th="${x.idx}" style="cursor:pointer">${playerRow(x.p, x.pos)}</div>`).join('')}</div><button class="btn warn" id="x">CANCEL</button>`);
+  $('#x', m).onclick = () => { snd('click'); closeModal(m); };
+  $$('[data-th]', m).forEach(b => b.onclick = () => { snd('click'); closeModal(m); poachPickMine(+b.dataset.th); });
+}
+function poachPickMine(theirIdx) {
+  const slots = theirIdx < 9 ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [9, 10, 11];
+  let sweet = 0;
+  const m = modal('');
+  const render = () => {
+    const rows = slots.map(s => { const v = E.oppTradeVerdict(run, theirIdx, s, sweet); return `<div data-mine="${s}" style="cursor:pointer;position:relative">${playerRow(E.playerAt(run, s), s < 9 ? E.POS[s] : (s === 9 ? 'SP' : 'RP'))}<span class="verdict ${v.ok ? 'g' : 'r'}">${v.ok ? 'THEY ACCEPT' : 'NEED $' + v.gap + ' MORE'}</span></div>`; }).join('');
+    const target = E.oppTradeVerdict(run, theirIdx, slots[0], 0).theirs;
+    m.querySelector('.box').innerHTML = `<h2>WHO GOES BACK?</h2>${playerRow(target, 'GET')}
+      <div class="row"><span class="sp" style="font-size:18px">Cash sweetener: <span class="y">$${sweet}</span> (you have $${run.gold})</span><button class="btn sm" id="sm">-</button><button class="btn sm" id="sp">+</button></div>
+      <div style="display:flex;flex-direction:column;gap:5px">${rows}</div><button class="btn warn" id="x">CANCEL</button>`;
+    $('#sm', m).onclick = () => { sweet = Math.max(0, sweet - 1); render(); };
+    $('#sp', m).onclick = () => { sweet = Math.min(run.gold, sweet + 1); render(); };
+    $('#x', m).onclick = () => { snd('click'); closeModal(m); };
+    $$('[data-mine]', m).forEach(b => b.onclick = () => {
+      const s = +b.dataset.mine, v = E.oppTradeVerdict(run, theirIdx, s, sweet);
+      if (!v.ok) { snd('bad'); return; }
+      const got = E.doOppTrade(run, theirIdx, s, sweet);
+      if (got) { snd('buy'); collect(got); saveRun(); closeModal(m); screenClub(); }
+    });
+  };
+  render();
+}
+
 /* ---------- draft ---------- */
 function newDraft() {
   if (!pendingTeam) pendingTeam = meta.lastTeam || 'BOS';
-  draft = E.newDraft(pendingMode.mode === 'daily' ? pendingMode.seed : (Math.random() * 2 ** 31) | 0);
+  draft = E.newDraft(pendingMode.seed != null ? pendingMode.seed : (Math.random() * 2 ** 31) | 0);
   screenDraft();
 }
 function avg(arr, k) { return Math.round(arr.reduce((a, p) => a + p[k], 0) / arr.length); }
 function screenDraft() {
   mount(`<div class="screen">
-    <div class="top"><h2 class="sp">DRAFT YOUR ROSTER</h2><button class="btn sm" id="back">BACK</button></div>
+    <div class="top"><h2 class="sp">PICK A STARTING ROSTER</h2><button class="btn sm" id="back">BACK</button></div>
     <p class="dim">${E.teamName(pendingTeam)}: pick a starting roster. Every one is beatable and every one is flawed.</p>
     ${draft.map((o, i) => {
       const t = o.team; const best = t.lineup.slice().sort((a, b) => E.ovr(b) - E.ovr(a)).slice(0, 3);
       return `<div class="px"><div class="row"><h2 class="sp">${o.name}</h2><span class="chip">${E.RELICS[o.relic].name}</span></div>
       <p class="dim" style="margin:6px 0">${o.desc}</p>
       <div class="stats" style="font-size:19px;margin-bottom:6px"><span>CON <b>${avg(t.lineup, 'con')}</b></span><span>POW <b>${avg(t.lineup, 'pow')}</b></span><span>EYE <b>${avg(t.lineup, 'eye')}</b></span><span>SPD <b>${avg(t.lineup, 'spd')}</b></span><span>DEF <b>${avg(t.lineup, 'def')}</b></span><span>SP <b>${t.pitchers[0].stf}</b></span></div>
+      <h3 style="margin-top:4px">TOP HITTERS</h3>
       <div style="display:flex;flex-direction:column;gap:5px">${best.map(p => playerRow(p, E.POS[t.lineup.indexOf(p)])).join('')}</div>
-      <button class="btn go" style="width:100%;margin-top:10px" data-pick="${i}">DRAFT THIS ROSTER</button></div>`;
+      <h3 style="margin-top:8px">PITCHING STAFF</h3>
+      <div style="display:flex;flex-direction:column;gap:5px">${t.pitchers.map((p, j) => playerRow(p, j === 0 ? 'SP' : 'RP')).join('')}</div>
+      <button class="btn go" style="width:100%;margin-top:10px" data-pick="${i}">TAKE THIS ROSTER</button></div>`;
     }).join('')}
     <button class="btn" id="again">SHOW ME THREE MORE</button>
   </div>`);
   $$('[data-pick]').forEach(b => b.onclick = () => {
     snd('buy');
-    const pm = pendingMode, seed = pm.mode === 'daily' ? pm.seed : (Math.random() * 2 ** 31) | 0;
-    run = E.startRun(draft[+b.dataset.pick], seed, pendingTeam, pm);
+    const pm = pendingMode, seed = pm.seed != null ? pm.seed : (Math.random() * 2 ** 31) | 0;
+    run = E.startRun(draft[+b.dataset.pick], seed, pendingTeam, Object.assign({}, pm, { perks: perks() }));
     if (pm.mode === 'daily') { meta.daily[pm.dateKey] = { done: false }; saveMeta(); }
     collectRoster(); saveRun(); backupRun(); screenClub();
   });
-  const ag = $('#again'); if (pendingMode.mode === 'daily') ag.remove(); else ag.onclick = () => { snd('click'); newDraft(); };
-  $('#back').onclick = () => { snd('click'); pendingMode.mode === 'daily' ? screenModes() : screenTeams(); };
+  const ag = $('#again'); if (pendingMode.seed != null) ag.remove(); else ag.onclick = () => { snd('click'); newDraft(); };
+  $('#back').onclick = () => { snd('click'); pendingMode.seed != null ? screenModes() : screenTeams(); };
   tips([['draft', 'Each roster has a style and a starting <span class="y">relic</span>. Relics are permanent team-wide buffs. Don\'t like these three? Reroll for free.', '.px']]);
 }
 
@@ -597,7 +781,7 @@ function screenClub() {
   if (run._bak !== run.stage) { run._bak = run.stage; backupRun(); }
   saveRun(true);
   const opp = E.oppFor(run);
-  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
+  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'seeded' ? `<span class="chip m">CODE: ${(run.code || '').toUpperCase()}</span>` : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
   const my = teamRating();
   const theirBat = Math.round(opp.lineup.reduce((a, p) => a + E.ovr(p), 0) / 9), theirSp = E.ovr(opp.pitchers[0]);
   const cmp = (a, b) => `<span class="${a > b ? 'g' : a < b ? 'r' : ''}">${a}</span> <span class="dim">vs</span> ${b}`;
@@ -614,9 +798,12 @@ function screenClub() {
       ${opp.bossId ? bossPanel(opp.bossId, opp.pitchers[0]) : ''}
     </div>
     ${rewards}
+    ${tradeDeskHTML(opp)}
     <div class="sec" id="shophead"><h2>SHOP</h2><button class="btn sm" id="reroll">REROLL $${2 + run.rerolls}</button></div>
     <div class="cards">${run.shop.map((r, i) => itemCard(r, i, 'shop', false)).join('')}</div>
-    <div class="sec"><h2>RELICS ${run.relics.length}/5</h2></div>
+    <div class="sec" id="playhead"><h2>PLAYBOOK</h2><span class="dim" style="font-size:18px">BUY NEW SIGNS IN THE SHOP</span></div>
+    <div class="px">${Object.keys(E.PLAYS).map(k => { const have = E.hasPlay(run, k); return `<span class="chip ${have ? 't' : 'lockd'}">${have ? '' : 'LOCKED '}${E.PLAYS[k].name}</span>`; }).join('')}</div>
+    <div class="sec" id="relichead"><h2>RELICS ${run.relics.length}/${E.relicSlots(run)}</h2><span class="dim" style="font-size:18px">${E.relicSlots(run) < 5 ? '+1 SLOT EVERY 3 WINS' : 'MAX SLOTS'}</span></div>
     <div class="px">${run.relics.map(id => `<div style="margin-bottom:6px"><span class="chip">${E.RELICS[id].name}</span><span class="dim" style="font-size:18px"> ${E.RELICS[id].desc}</span></div>`).join('')}</div>
     <div class="sec" id="lineuphead"><h2>LINEUP</h2><span class="dim" style="font-size:18px">TAP TWO TO SWAP ORDER</span></div>
     <div style="display:flex;flex-direction:column;gap:5px">${run.lineup.map((p, i) => playerRow(p, E.POS[i], { cls: sel === i ? 'sel' : '', attr: `data-ln="${i}"` })).join('')}</div>
@@ -634,8 +821,13 @@ function screenClub() {
     const y = $('.screen').scrollTop; screenClub(); $('.screen').scrollTop = y;
   });
   $('#play').onclick = () => { snd('click'); startGame(); };
+  $$('[data-tyes]').forEach(b => b.onclick = () => { if (E.acceptOffer(run, +b.dataset.tyes)) { snd('buy'); collectRoster(); saveRun(); const y = $('.screen').scrollTop; screenClub(); $('.screen').scrollTop = y; } });
+  $$('[data-tno]').forEach(b => b.onclick = () => { run.trades[+b.dataset.tno].done = true; snd('click'); saveRun(); const y = $('.screen').scrollTop; screenClub(); $('.screen').scrollTop = y; });
+  const pb = $('#poach'); if (pb) pb.onclick = () => { snd('click'); poachFlow(); };
   const T = [];
   if (run.rewards) T.push(['reward', 'You won, so you get a <span class="y">free pick</span>. Players replace someone on your roster. Training boosts one guy for good.', '#rewards']);
+  if (run.mode === 'trade') T.push(['trade', 'Trade Desk: GMs call with offers after every game. You can also poach a player from your <span class="y">next opponent</span>. You get better and they get worse.', '#tradehead']);
+  T.push(['playbook', 'You start with a thin <span class="y">PLAYBOOK</span>. Steals, bunts, walks and more show up in the shop as cards. Relic slots grow too: one more every 3 wins.', '#playhead']);
   T.push(['club_opp', 'Scouting report on your next opponent. <span class="g">Green</span> means you have the edge. <span class="r">Red chips</span> are their tricks. Plan around them.', '#oppcard']);
   T.push(['club_shop', 'Gold buys <span class="y">relics</span>, <span class="y">free agents</span> and <span class="y">training</span>. You earn more every game, more for wins. Reroll if nothing fits.', '#shophead']);
   T.push(['club_lineup', 'Your lineup. Tap two players to swap them. Top of the order bats most, so stack your best hitters up there.', '#lineuphead']);
@@ -657,6 +849,7 @@ function itemCard(it, i, kind, free) {
   if (it.t === 'relic') { const r = E.RELICS[it.id]; body = `<div class="nm y">${r.name}</div><div class="d">${r.desc}</div>`; }
   else if (it.t === 'train') { const t = E.TRAINING[it.id]; body = `<div class="nm c">${t.name}</div><div class="d">${t.desc}</div>`; }
   else if (it.t === 'gold') { body = `<div class="nm y">CASH $${it.amt}</div><div class="d">Pocket the money.</div>`; }
+  else if (it.t === 'play') { const pl = E.PLAYS[it.id]; body = `<div class="nm g">${pl.name}</div><div class="kind">PLAYBOOK CARD</div><div class="d">${pl.desc}</div>`; }
   else { const p = it.p; body = `<div class="row" style="gap:6px"><img class="pt" src="${portrait(p)}" alt=""><div class="info" style="min-width:0"><div class="nm">${p.name}</div><div class="kind">${tierBadge(p)}${p.kind === 'bat' ? 'HITTER' : p.kind.toUpperCase()} <span class="y">${E.ovr(p)}</span></div></div></div>${statsHTML(p)}<div>${traitChip(p)}</div>`; }
   const tcls = it.p ? 'tier-' + tierOf(it.p) : '';
   return `<div class="card ${tcls} ${free ? 'pick' : ''} ${it.sold ? 'sold' : ''}"><div style="flex:1;display:flex;flex-direction:column;gap:5px">${body}</div><button class="btn sm ${afford ? (free ? 'gold' : '') : ''}" ${afford ? '' : 'disabled'} ${attr}>${free ? 'TAKE IT' : (it.sold ? 'SOLD' : 'BUY ' + price)}</button></div>`;
@@ -665,10 +858,11 @@ async function placeItem(it) {
   // returns true if applied
   if (it.t === 'relic') {
     let rep = null;
-    if (run.relics.length >= 5) { rep = await chooseRelic(it.id); if (rep == null) return false; }
+    if (run.relics.length >= E.relicSlots(run)) { rep = await chooseRelic(it.id); if (rep == null) return false; }
     E.addRelic(run, it.id, rep); return true;
   }
   if (it.t === 'gold') { run.gold += it.amt; return true; }
+  if (it.t === 'play') { if (!run.plays) return true; if (!run.plays.includes(it.id)) run.plays.push(it.id); return true; }
   if (it.t === 'bat' || it.t === 'pit') {
     const slot = await chooseSlot({ player: it.p }); if (slot == null) return false;
     E.placePlayer(run, it.p, slot); collect(it.p); return true;
@@ -766,7 +960,16 @@ function quietPanel(text) {
   $('#panel').innerHTML = `<div class="panel quiet"><div class="row"><span class="dim sp">${text || 'PLAYING...'}</span><button class="btn sm ${settings.fast ? 'on' : ''}" id="ff">${settings.fast ? 'FAST' : 'NORMAL'}</button></div></div>`;
   $('#ff').onclick = () => { settings.fast = !settings.fast; saveSettings(); snd('click'); $('#ff').className = 'btn sm' + (settings.fast ? ' on' : ''); $('#ff').textContent = settings.fast ? 'FAST' : 'NORMAL'; };
 }
-function oddsText(o) { return `K${pct(o.K)} BB${pct(o.BB)}<br>H${pct(o.H)} HR${pct(o.HR)}`; }
+/* plain-language odds: on base, homer, strikeout, with the change vs NORMAL colored good/bad for you */
+function oddsBlock(o, base, bat, isBase) {
+  const rows = [[bat ? 'On base' : 'They reach', o.H + o.BB, base.H + base.BB, true], [bat ? 'Homer' : 'They homer', o.HR, base.HR, true], ['Strikeout', o.K, base.K, false]];
+  return '<span class="ob">' + rows.map(([lab, v, bv, upGoodForBatter]) => {
+    const d = Math.round(v * 100) - Math.round(bv * 100);
+    const good = (d > 0) === (bat ? upGoodForBatter : !upGoodForBatter);
+    const delta = isBase || !d ? '' : `<em class="${good ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}</em>`;
+    return `<span class="or"><span>${lab}</span><b>${pct(v)}%${delta}</b></span>`;
+  }).join('') + '</span>';
+}
 
 function askDecision(G, pa) {
   return new Promise(res => {
@@ -775,13 +978,14 @@ function askDecision(G, pa) {
     const apprs = bat ? E.APPR_BAT : E.APPR_PIT;
     let infield = false;
     const render = () => {
-      const keys = Object.keys(apprs);
+      const keys = Object.keys(apprs).filter(k => (k !== 'patient' && k !== 'nibble') || E.hasPlay(G, k));
       const odds = {}; keys.forEach(k => { odds[k] = E.preview(G, pa.side, { appr: k, clutch, infield }); });
       const nextP = !bat && pa.canPull ? G.t.us.pitchers[G.t.us.pi + 1] : null;
       const tired = !bat && pa.gas <= 0;
       let h = `<div class="panel"><div class="row"><h3 class="sp">${bat ? 'YOU ARE UP: ' + pa.batter.name : 'ON THE MOUND: ' + pa.pitcher.name}</h3>${pa.canClutch ? `<button class="btn sm ${clutch ? 'on' : ''}" id="cl">CLUTCH x${G.clutch}</button>` : '<span class="dim">NO CLUTCH</span>'}</div>
       <div class="dim" style="font-size:18px">${situation(G)}${tired ? ' <span class="r">ARM IS TIRED!</span>' : ''}</div>
-      <div class="${bat ? 'grid4' : 'grid4'}" style="${bat ? '' : 'grid-template-columns:repeat(3,1fr)'}">${keys.map(k => { const rd = G.bossId ? E.readsOf(G, bat ? 'bat' : 'pit', k) : 0; return `<button class="btn ${k === 'normal' && !rd ? 'go' : ''} ${rd >= 3 ? 'warn' : ''}" data-a="${k}">${apprs[k].name}${rd && !clutch ? `<span class="read">READ ${rd}</span>` : ''}<small class="odds">${oddsText(odds[k])}</small></button>`; }).join('')}</div>`;
+      <div class="oddshead">${bat ? 'Your odds this at-bat' : 'Their odds against each pitch call'}<span>vs NORMAL</span></div>
+      <div class="grid2 appr">${keys.map(k => { const rd = G.bossId ? E.readsOf(G, bat ? 'bat' : 'pit', k) : 0; return `<button class="btn ${k === 'normal' && !rd ? 'go' : ''} ${rd >= 3 ? 'warn' : ''}" data-a="${k}">${apprs[k].name}${rd && !clutch ? `<span class="read">READ ${rd}</span>` : ''}${oddsBlock(odds[k], odds.normal, bat, k === 'normal')}</button>`; }).join('')}</div>`;
       const sp = [];
       if (bat) {
         if (pa.canSteal) sp.push(`<button class="btn" data-x="steal">STEAL ${pct(E.stealProb(G))}%<small>${G.bases[1] && !G.bases[2] ? 'to 3rd' : 'to 2nd'}</small></button>`);
@@ -808,7 +1012,7 @@ function askDecision(G, pa) {
     const sc = $('#gs'); if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
     const T = [];
     if (bat) {
-      T.push(['bat', 'Your call, skipper. Pick an approach. The numbers are your odds this at-bat: <span class="c">K</span> strikeout, <span class="c">BB</span> walk, <span class="c">H</span> hit, <span class="c">HR</span> home run.', '#panel']);
+      T.push(['bat', 'Your call, skipper. Each button shows your odds this at-bat: <span class="c">On base</span> (hit or walk), <span class="c">Homer</span>, and <span class="c">Strikeout</span>. The small number is the change from NORMAL: <span class="g">green helps you</span>, <span class="r">orange hurts</span>.', '#panel']);
       if (pa.canSteal) T.push(['steal', 'Runner on? <span class="y">STEAL</span> shows the success odds. Under 70% is usually a bad bet. <span class="y">BUNT</span> trades an out to move runners up.', '[data-x="steal"]']);
     } else {
       T.push(['pitch', 'Now you\'re pitching. <span class="y">ATTACK</span> gets strikeouts but serves up homers. <span class="y">NIBBLE</span> avoids damage but walks guys.', '#panel']);
@@ -880,11 +1084,14 @@ async function gameOver(G) {
   const info = E.finishGame(run, G);
   if (run.done) {
     meta.runs++; meta.bestWins = Math.max(meta.bestWins, run.wins);
+    run.fansEarned = E.fansFor(run); meta.fans += run.fansEarned;
+    if (meta.best >= 9 || run.stage >= 8) { if (!meta.fo.includes('gauntlet')) { meta.fo.push('gauntlet'); run.gauntletUnlocked = true; } }
     if (run.mode === 'season') {
       meta.best = Math.max(meta.best, Math.min(12, run.stage + (run.champion ? 0 : 1)));
       if (run.champion) { meta.titles++; if ((run.pressure || 0) >= meta.pressure && meta.pressure < 8) { meta.pressure = (run.pressure || 0) + 1; run.unlocked = meta.pressure; } }
     } else if (run.mode === 'daily') { meta.daily[run.dateKey] = { done: true, wins: run.wins, losses: run.losses, champ: run.champion }; if (run.champion) meta.titles++; }
     else if (run.mode === 'gauntlet') { run.newBest = run.wins > meta.gauntletBest; meta.gauntletBest = Math.max(meta.gauntletBest, run.wins); }
+    else { meta.best = Math.max(meta.best, Math.min(12, run.stage + (run.champion ? 0 : 1))); if (run.champion) meta.titles++; }
     saveMeta();
   } else backupRun();
   saveRun();
@@ -903,7 +1110,9 @@ function screenEnd() {
     <img class="ballbig" src="${ballIcon()}" alt="">
     <div class="big">${run.mode === 'gauntlet' ? 'GAUNTLET OVER' : champ ? 'CHAMPIONS!' : 'SEASON OVER'}</div>
     <p class="${champ || run.newBest ? 'g' : 'r'}" style="font-size:23px;line-height:1.4">${run.mode === 'gauntlet' ? 'The ' + E.TEAMS[run.team].nick + ' won ' + run.wins + ' straight-up games.' + (run.newBest ? ' NEW BEST!' : ' Best: ' + meta.gauntletBest + '.') : champ ? 'The ' + E.teamName(run.team) + ' win the World Series. Absolute ballclub.' : (run.stage < 8 ? 'The ' + E.TEAMS[run.team].nick + ' got you fired in game ' + (run.stage + 1) + '.' : 'The ' + E.TEAMS[run.team].nick + ' are out in the ' + E.stageLabel(run, Math.min(run.stage, 11)) + '.')}</p>
+    ${run.fansEarned ? `<p class="gold" style="font-size:14px">+${run.fansEarned} FANS</p><p class="dim" style="font-size:18px">Spend them in the Front Office. You have ${meta.fans}.</p>` : ''}
     ${run.unlocked ? `<p class="y" style="font-size:23px">PRESSURE ${run.unlocked} UNLOCKED</p>` : ''}
+    ${run.gauntletUnlocked ? '<p class="y" style="font-size:23px">GAUNTLET UNLOCKED</p>' : ''}
     ${run.mode === 'daily' ? '<p class="dim" style="font-size:20px">A new Daily Game drops tomorrow.</p>' : ''}
     <div class="px" style="width:100%;text-align:left;line-height:1.7;font-size:22px">
       RECORD <span class="y">${run.wins}-${run.losses}</span><br>
