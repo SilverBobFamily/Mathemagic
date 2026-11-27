@@ -220,3 +220,8 @@ h3{font-family:var(--fh);font-size:10px;line-height:1.6;color:var(--cyan)}
 
 .chip{font-family:var(--fb);letter-spacing:0}
 h3 .chip{font-size:16px;vertical-align:1px;margin:0 0 0 4px}
+
+/* code entry */
+.codein{flex:1;min-width:0;font-family:var(--fh);font-size:14px;text-transform:uppercase;color:var(--yellow);background:var(--ink);border:3px solid var(--paper);padding:12px 10px;min-height:46px;-webkit-user-select:text;user-select:text;border-radius:0}
+.codein:focus{outline:3px solid var(--cyan);outline-offset:1px}
+.codein::placeholder{color:#5a6f8c;text-transform:none;font-family:var(--fb);font-size:18px}

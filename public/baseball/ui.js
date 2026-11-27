@@ -502,6 +502,10 @@ function screenModes() {
       <div class="d"><span class="y">${P[pressSel].name}:</span> ${pressSel ? P.slice(1, pressSel + 1).map(x => x.desc).join(' ') : P[0].desc}${meta.pressure < 8 ? ` <span class="dim">Win at Pressure ${meta.pressure} to unlock ${meta.pressure + 1}.</span>` : ''}</div>
       <button class="btn go" id="go-season">START SEASON</button>
     </div>
+    <div class="px mode" id="m-code">
+      <h2>ENTER A CODE</h2><div class="d">Same code, same game: city, rosters, schedule, shops. Share one with a friend and compare. Try <span class="y">jooz</span>.</div>
+      <div class="row"><input id="code" class="codein" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type a code" aria-label="Game code"><button class="btn go" id="go-code">GO</button></div>
+    </div>
     <div class="px mode" id="m-daily">
       <h2>${E.MODES.daily.name}</h2><div class="d">${E.MODES.daily.desc}</div>
       <div class="d">Today: <span class="y">${E.teamName(di.team)}</span></div>
@@ -516,17 +520,51 @@ function screenModes() {
     </div>
     ${['draft', 'franchise', 'trade'].map(k => `<div class="px mode ${owns(k) ? '' : 'locked'}" id="m-${k}"><h2>${E.MODES[k].name}</h2><div class="d">${E.MODES[k].desc}</div>${owns(k) ? `<button class="btn go" id="go-${k}">START ${E.MODES[k].name}</button>` : lockedCard(k)}</div>`).join('')}
   </div>`);
-  ['draft', 'franchise', 'trade'].forEach(k => { const b = $('#go-' + k); if (b) b.onclick = () => { snd('click'); pendingMode = { mode: k }; screenTeams(); }; });
+  ['draft', 'franchise', 'trade'].forEach(k => { const b = $('#go-' + k); if (b) b.onclick = () => { snd('click'); pendingMode = { mode: k, seed: null }; screenTeams(); }; });
   $$('[data-fo]').forEach(b => b.onclick = () => { snd('click'); screenFrontOffice(true); });
+  const goCode = () => {
+    const info = E.codeInfo($('#code').value);
+    if (!info) { snd('bad'); $('#code').focus(); return; }
+    snd('click');
+    pendingMode = { mode: 'seeded', seed: info.seed, code: info.code };
+    pendingTeam = info.team;
+    if (info.known) screenSeedPreview(info); else newDraft();
+  };
+  $('#go-code').onclick = goCode;
+  $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') goCode(); });
   $('#back').onclick = () => { snd('click'); screenTitle(); };
   $$('[data-p]').forEach(b => b.onclick = () => { pressSel = +b.dataset.p; snd('click'); const y = $('.screen').scrollTop; screenModes(); $('.screen').scrollTop = y; });
-  $('#go-season').onclick = () => { snd('click'); pendingMode = { mode: 'season', pressure: pressSel }; screenTeams(); };
+  $('#go-season').onclick = () => { snd('click'); pendingMode = { mode: 'season', pressure: pressSel, seed: null }; screenTeams(); };
   if ($('#go-daily')) $('#go-daily').onclick = () => {
     snd('click'); pendingMode = { mode: 'daily', dmods: di.dmods, dateKey: today, seed: di.seed };
     pendingTeam = di.team; newDraft();
   };
-  if ($('#go-gauntlet')) $('#go-gauntlet').onclick = () => { snd('click'); pendingMode = { mode: 'gauntlet' }; screenTeams(); };
+  if ($('#go-gauntlet')) $('#go-gauntlet').onclick = () => { snd('click'); pendingMode = { mode: 'gauntlet', seed: null }; screenTeams(); };
   tips([['modes', 'Start with a <span class="y">SEASON</span>. Win one and you unlock <span class="y">PRESSURE</span> levels, each one harder. The <span class="y">DAILY GAME</span> is a fresh challenge every day.', '#m-season']]);
+}
+
+/* ---------- code games ---------- */
+function screenSeedPreview(info) {
+  const K = info.known, team = E.makeSeedTeam(info.code), T = E.TEAMS[info.team];
+  mount(`<div class="screen">
+    <div class="top"><h2 class="sp">CODE: ${info.code.toUpperCase()}</h2><button class="btn sm" id="back">BACK</button></div>
+    <div class="px hl"><h2>${K.title}</h2><p class="dim" style="font-size:18px;margin-top:6px">${K.desc}</p>
+      <p style="font-size:18px;margin-top:6px">Playing as the <span class="y">${E.teamName(info.team)}</span>. Starting relic: <span class="y">${E.RELICS[K.relic].name}</span>.</p></div>
+    <h3>STARTING LINEUP</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.lineup.map((p, i) => playerRow(p, team.positions[i])).join('')}</div>
+    <h3>PITCHING STAFF</h3>
+    <div style="display:flex;flex-direction:column;gap:5px">${team.pitchers.map((p, i) => playerRow(p, i === 0 ? 'SP' : 'RP')).join('')}</div>
+    <h3>STILL OUT THERE (${team.pool.length})</h3>
+    <div class="hof">${team.pool.map(n => `<span class="tier-${(E.TIERS && window.PT_PLAYERS.WHO[n] ? window.PT_PLAYERS.WHO[n].tier : 'C')}">${n}</span>`).join('')}</div>
+    <div class="sticky"><button class="btn go" style="width:100%" id="ok">PLAY BALL</button></div>
+  </div>`);
+  $('#back').onclick = () => { snd('click'); screenModes(); };
+  $('#ok').onclick = () => {
+    snd('buy');
+    run = E.startRun({ key: 'custom', team: { lineup: team.lineup, pitchers: team.pitchers }, relic: team.relic }, info.seed, info.team,
+      { mode: 'seeded', code: info.code, namePool: team.pool });
+    collectRoster(); saveRun(); backupRun(); screenClub();
+  };
 }
 
 /* ---------- front office ---------- */
@@ -700,7 +738,7 @@ function poachPickMine(theirIdx) {
 /* ---------- draft ---------- */
 function newDraft() {
   if (!pendingTeam) pendingTeam = meta.lastTeam || 'BOS';
-  draft = E.newDraft(pendingMode.mode === 'daily' ? pendingMode.seed : (Math.random() * 2 ** 31) | 0);
+  draft = E.newDraft(pendingMode.seed != null ? pendingMode.seed : (Math.random() * 2 ** 31) | 0);
   screenDraft();
 }
 function avg(arr, k) { return Math.round(arr.reduce((a, p) => a + p[k], 0) / arr.length); }
@@ -723,13 +761,13 @@ function screenDraft() {
   </div>`);
   $$('[data-pick]').forEach(b => b.onclick = () => {
     snd('buy');
-    const pm = pendingMode, seed = pm.mode === 'daily' ? pm.seed : (Math.random() * 2 ** 31) | 0;
+    const pm = pendingMode, seed = pm.seed != null ? pm.seed : (Math.random() * 2 ** 31) | 0;
     run = E.startRun(draft[+b.dataset.pick], seed, pendingTeam, Object.assign({}, pm, { perks: perks() }));
     if (pm.mode === 'daily') { meta.daily[pm.dateKey] = { done: false }; saveMeta(); }
     collectRoster(); saveRun(); backupRun(); screenClub();
   });
-  const ag = $('#again'); if (pendingMode.mode === 'daily') ag.remove(); else ag.onclick = () => { snd('click'); newDraft(); };
-  $('#back').onclick = () => { snd('click'); pendingMode.mode === 'daily' ? screenModes() : screenTeams(); };
+  const ag = $('#again'); if (pendingMode.seed != null) ag.remove(); else ag.onclick = () => { snd('click'); newDraft(); };
+  $('#back').onclick = () => { snd('click'); pendingMode.seed != null ? screenModes() : screenTeams(); };
   tips([['draft', 'Each roster has a style and a starting <span class="y">relic</span>. Relics are permanent team-wide buffs. Don\'t like these three? Reroll for free.', '.px']]);
 }
 
@@ -743,7 +781,7 @@ function screenClub() {
   if (run._bak !== run.stage) { run._bak = run.stage; backupRun(); }
   saveRun(true);
   const opp = E.oppFor(run);
-  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
+  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'seeded' ? `<span class="chip m">CODE: ${(run.code || '').toUpperCase()}</span>` : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
   const my = teamRating();
   const theirBat = Math.round(opp.lineup.reduce((a, p) => a + E.ovr(p), 0) / 9), theirSp = E.ovr(opp.pitchers[0]);
   const cmp = (a, b) => `<span class="${a > b ? 'g' : a < b ? 'r' : ''}">${a}</span> <span class="dim">vs</span> ${b}`;

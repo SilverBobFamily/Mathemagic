@@ -62,12 +62,15 @@ Object.keys(FRANCHISE).forEach(team => {
     FR[team][k].push({ name, tier: WHO[name].tier });
   }));
 });
+/* Seed rosters: extra players that only some codes use (they still join the main pool) */
+const SEED_PLAYERS = 'bat:Harrison Baider:U|bat:Zack Geloff:U|bat:Gabe Kaplar:C|bat:Joc Pedersen:U|bat:Rowdy Tellas:C|bat:Kevin Youkilus:R|bat:Hunter Bishopp:C|bat:Alex Dickersen:C|bat:Sam Fould:C|bat:Dalton Guthry:C|bat:Ryan Lavarnwey:C|bat:Mike Liebertal:U|bat:Matt Mervys:C|bat:Al Rosenn:R|bat:Garrett Stubbz:C|pit:Jake Fishmann:C|pit:Max Freid:R|pit:Dean Kremmer:U|pit:Rob Kaminski:C|pit:Jared Schuster:C|pit:Jacob Steinmitz:C|pit:Rob Stocke:C|pit:Steve Stoan:U';
+SEED_PLAYERS.split('|').forEach(r => { const [k, name, tier] = r.split(':'); if (!WHO[name]) { DB[k][tier].push(name); WHO[name] = { kind: k, tier }; } });
 const TIERS = {
   C: { name: 'COMMON',    short: 'C', color: '#b8c7d4', boost: 0,  trait: 0.12 },
   U: { name: 'UNCOMMON',  short: 'U', color: '#a7f070', boost: 5,  trait: 0.35 },
   R: { name: 'RARE',      short: 'R', color: '#41a6f6', boost: 10, trait: 0.7 },
   L: { name: 'LEGENDARY', short: 'L', color: '#ffcd75', boost: 17, trait: 1 },
 };
-const api = { DB, TIERS, FR };
+const api = { DB, TIERS, FR, WHO };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PT_PLAYERS = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -24,6 +24,14 @@ const hashSeed = (a, b) => ((a * 2654435761) ^ (b * 40503 + 977)) | 0;
 
 /* ---------- data ---------- */
 let TAKEN = null; // Set of names already on the team being generated
+let POOL = null;  // names a code game wants to surface in shops and rewards
+function poolPick(h, kind) {
+  if (!POOL || !POOL.length) return null;
+  const c = POOL.filter(n => { const w = PDB.WHO[n]; return w && w.kind === kind && !(TAKEN && TAKEN.has(n)); });
+  if (!c.length || !chance(h, 0.6)) return null;
+  const n = pick(h, c); if (TAKEN) TAKEN.add(n);
+  return { name: n, tier: PDB.WHO[n].tier };
+}
 const PDB = (typeof module !== 'undefined' && module.exports) ? require('./players.js') : root.PT_PLAYERS;
 const TIERS = PDB.TIERS;
 /* weighted rarity roll. lift 0..1 shifts odds toward the good stuff */
@@ -213,9 +221,38 @@ const MODES = {
   gauntlet: { name: 'GAUNTLET', desc: 'Endless. Every game is harder. How many can you win before 3 losses?' },
   draft:    { name: 'DRAFT DAY', desc: 'Build your roster one pick at a time: 12 rounds, every position, pick 1 of 4. Then play a Season.' },
   franchise:{ name: 'FRANCHISE LEGENDS', desc: 'Start with your city\'s all-time greats. A little past their prime. Then play a Season.' },
+  seeded:   { name: 'CODE GAME', desc: 'Type a code. Same code, same game, for anyone you share it with.' },
   trade:    { name: 'TRADE DESK', desc: 'A Season where GMs call you between games, and you can poach players off your next opponent.' },
 };
-const SEASON_LIKE = ['season', 'daily', 'draft', 'franchise', 'trade'];
+const SEASON_LIKE = ['season', 'daily', 'draft', 'franchise', 'trade', 'seeded'];
+/* Pre-built code games. Any other code still works: it seeds a normal season everyone can replay. */
+const SEEDS = {
+  jooz: {
+    title: 'TEAM JOOZ',
+    desc: '31 Jewish big leaguers, slightly bent. You start with 12. The other 19, Sandy Koufox included, turn up in your shops and free picks.',
+    team: 'LAD', relic: 'rally_cap',
+    lineup: [['Mike Liebertal', 'C'], ['Hank Greenburg', '1B'], ['Ian Kinslar', '2B'], ['Kevin Youkilus', '3B'], ['Alex Bregmann', 'SS'], ['Ryan Braune', 'LF'], ['Harrison Baider', 'CF'], ['Shawn Greene', 'RF'], ['Joc Pedersen', 'DH']],
+    pitchers: ['Max Freid', 'Dean Kremmer', 'Steve Stoan'],
+    pool: ['Sandy Koufox', 'Ike Davish', 'Zack Geloff', 'Gabe Kaplar', 'Kevin Pillarr', 'Rowdy Tellas', 'Hunter Bishopp', 'Alex Dickersen', 'Sam Fould', 'Dalton Guthry', 'Ryan Lavarnwey', 'Matt Mervys', 'Al Rosenn', 'Garrett Stubbz', 'Jake Fishmann', 'Rob Kaminski', 'Jared Schuster', 'Jacob Steinmitz', 'Rob Stocke'],
+  },
+};
+const normCode = c => String(c || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+function codeSeed(code) { let h = 2166136261; for (const ch of normCode(code)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h | 0; }
+function codeInfo(code) {
+  const c = normCode(code); if (!c) return null;
+  const seed = codeSeed(c), known = SEEDS[c];
+  const team = known ? known.team : Object.keys(TEAMS)[Math.abs(hashSeed(seed, 5)) % Object.keys(TEAMS).length];
+  return { code: c, seed, team, known: known || null };
+}
+function makeSeedTeam(code) {
+  const info = codeInfo(code); if (!info || !info.known) return null;
+  const K = info.known, h = { rs: hashSeed(info.seed, 4243) };
+  const who = n => PDB.WHO[n] || { kind: 'bat', tier: 'C' };
+  const age = t => TIERS[t].boost * 0.45;
+  const lineup = K.lineup.map(([n]) => genBatter(h, 45 - age(who(n).tier), null, 0.3, who(n).tier, n));
+  const pitchers = K.pitchers.map((n, i) => genPitcher(h, (i === 0 ? 47 : 45) - age(who(n).tier), i === 0 ? 'sp' : 'rp', 0.3, who(n).tier, n));
+  return { lineup, pitchers, relic: K.relic, pool: K.pool.slice(), positions: K.lineup.map(x => x[1]) };
+}
 const PRESSURE = [
   { name: 'ROOKIE',     desc: 'The standard season.' },
   { name: 'PRESSURE 1', desc: 'Opponents +3 across the board.' },
@@ -244,7 +281,7 @@ function buildCfg(mode, pressure, dmods, perks) {
     hr: 1, sta: 0, pow: 0, spd: 0, stf: 0, gameLen: GAME_LEN, winGold: 0, legendX: 1,
     relicPack: 0, shopBonus: 0, rpStf: 0, slotBonus: 0, scoutLift: 0, startPlays: [] };
   // daily runs are the same for everyone: no perks, full relic pool, full playbook
-  const pk = mode === 'daily' ? null : (perks || []);
+  const pk = mode === 'daily' || mode === 'seeded' ? null : (perks || []);
   if (!pk) { c.relicPack = 2; c.startPlays = Object.keys(PLAYS); }
   else {
     if (pk.includes('relics1')) c.relicPack = 1;
@@ -299,6 +336,7 @@ function traitChance(traitP, tier) {
 }
 function genBatter(h, q, bias, traitP, tier, fixedName) {
   bias = bias || {}; tier = tier || 'C';
+  if (!fixedName) { const pp = poolPick(h, 'bat'); if (pp) { fixedName = pp.name; tier = pp.tier; } }
   const bq = q + TIERS[tier].boost;
   const g = k => clamp(Math.round(norm(h, bq + (bias[k] || 0), 8)), 20, 99);
   const p = { id: newId(h), kind: 'bat', tier, name: fixedName || pickName(h, 'bat', tier), con: g('con'), pow: g('pow'), eye: g('eye'), spd: g('spd'), def: g('def'), trait: null, look: ri(h, 1, 999999) };
@@ -307,6 +345,7 @@ function genBatter(h, q, bias, traitP, tier, fixedName) {
 }
 function genPitcher(h, q, kind, traitP, tier, fixedName) {
   tier = tier || 'C';
+  if (!fixedName) { const pp = poolPick(h, 'pit'); if (pp) { fixedName = pp.name; tier = pp.tier; } }
   const bq = q + TIERS[tier].boost;
   const g = (m) => clamp(Math.round(norm(h, m, 8)), 20, 99);
   const p = { id: newId(h), kind, tier, name: fixedName || pickName(h, 'pit', tier), stf: g(bq), ctl: g(bq), sta: (kind === 'sp' ? ri(h, 13, 19) : ri(h, 5, 8)) + (tier === 'L' ? 2 : tier === 'R' ? 1 : 0), trait: null, look: ri(h, 1, 999999) };
@@ -343,7 +382,7 @@ function startRun(opt, seed, teamKey, o) {
   const cfg = buildCfg(mode, pressure, dmods, o.perks);
   const sig = { small: 'steal', slug: 'patient', duel: 'nibble' }[opt.key];
   const run = {
-    v: 3, mode, pressure, dmods, dateKey: o.dateKey || null, cfg, clutchBonus: 0, lossBonus: 0, nextQuirk: 0, event: null, lastEventStage: -9,
+    v: 3, mode, pressure, dmods, dateKey: o.dateKey || null, cfg, code: o.code || null, namePool: o.namePool || null, clutchBonus: 0, lossBonus: 0, nextQuirk: 0, event: null, lastEventStage: -9,
     seed: seed | 0, rs: hashSeed(seed, 7), arch: opt.key, team: teamKey, schedule: null, stage: 0, wins: 0, losses: 0, gold: cfg.startGold,
     lineup: opt.team.lineup, pitchers: opt.team.pitchers, relics: [opt.relic],
     plays: Array.from(new Set(cfg.startPlays.concat(sig ? [sig] : []))),
@@ -561,7 +600,7 @@ function makeTraining(h, n) { return sample(h, Object.keys(TRAINING), n); }
 function rosterNames(run) { return new Set(run.lineup.concat(run.pitchers).map(p => p.name)); }
 function makeShop(run) {
   const h = run;
-  TAKEN = rosterNames(run);
+  TAKEN = rosterNames(run); POOL = run.namePool || null;
   const q = stageQuality(run.stage);
   const owned = new Set(run.relics);
   const relicPool = Object.keys(RELICS).filter(k => !owned.has(k) && relicPack(k) <= (cfgOf(run).relicPack || 0));
@@ -578,12 +617,12 @@ function makeShop(run) {
   const lockedPlays = Object.keys(PLAYS).filter(k => run.plays && !run.plays.includes(k));
   if (lockedPlays.length) { const id = pick(h, lockedPlays); items.push({ t: 'play', id, price: 4 + up }); }
   makeTraining(h, nTrain).forEach(id => items.push({ t: 'train', id, price: 3 + up }));
-  TAKEN = null;
+  TAKEN = null; POOL = null;
   return items;
 }
 function makeRewards(run) {
   const h = run;
-  TAKEN = rosterNames(run);
+  TAKEN = rosterNames(run); POOL = run.namePool || null;
   const q = stageQuality(run.stage) + 2;
   const cfg = cfgOf(run), lift = Math.min(1, 0.25 + run.stage / 14), lx = cfg.legendX;
   const owned = new Set(run.relics);
@@ -596,7 +635,7 @@ function makeRewards(run) {
   const lockedPlays = Object.keys(PLAYS).filter(k => run.plays && !run.plays.includes(k));
   if (lockedPlays.length) { mix.push({ t: 'play', id: pick(h, lockedPlays) }); mix.push({ t: 'play', id: pick(h, lockedPlays) }); }
   out.push(pick(h, mix));
-  TAKEN = null;
+  TAKEN = null; POOL = null;
   return out.slice(0, cfg.rewardN);
 }
 function rerollShop(run) {
@@ -1140,6 +1179,7 @@ function allPlayers() {
 }
 
 const api = {
+  SEEDS, codeInfo, makeSeedTeam, normCode,
   PLAYS, FRONT_OFFICE, fansFor, relicSlots, relicPack, hasPlay,
   BOSSES, READ_CAP, readsOf, SEASON_LIKE, makeFranchiseTeam, relicChoices, DRAFT_SLOTS, draftRound, tradeValue, acceptOffer, oppTradeVerdict, doOppTrade,
   TEAMS, LEAGUES, teamName, stageLabel, TIERS, MODES, PRESSURE, DAILY_MODS, EVENTS, buildCfg, dailyInfo, eventChoices, resolveEvent, maxLosses, totalStages, allPlayers, rollTier,
