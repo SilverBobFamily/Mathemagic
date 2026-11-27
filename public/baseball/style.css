@@ -193,3 +193,30 @@ h3{font-family:var(--fh);font-size:10px;line-height:1.6;color:var(--cyan)}
 .btn.warn .odds{color:var(--paper)}
 @keyframes blink{50%{opacity:.6}}
 @media (prefers-reduced-motion:reduce){.bosstag{animation:none}}
+
+/* readable odds */
+.oddshead{display:flex;justify-content:space-between;font-size:17px;color:var(--dim)}
+.appr .btn{padding:9px 8px;text-align:center}
+.ob{display:block;margin-top:6px;font-family:var(--fb);font-size:18px;line-height:1.15;text-align:left;letter-spacing:0}
+.or{display:flex;justify-content:space-between;gap:6px}
+.or b{font-weight:400;white-space:nowrap}
+.or em{font-style:normal;margin-left:5px}
+.or em.up{color:var(--lime)}.or em.dn{color:var(--orange)}
+.btn.go .or em.up{color:#14532d}.btn.go .or em.dn{color:#7a2438}
+.btn.warn .or em.up,.btn.warn .or em.dn{color:var(--paper)}
+
+/* trade desk */
+.trade{display:flex;flex-direction:column;gap:6px;border-color:var(--cyan)}
+.tsw{width:18px;height:18px;border:4px solid;display:block;flex:none}
+.tlabel{font-family:var(--fh);font-size:9px;margin-top:4px}
+.verdict{display:block;text-align:right;font-family:var(--fh);font-size:8px;padding:4px 2px 0}
+.verdict.g{color:var(--lime)}.verdict.r{color:var(--orange)}
+
+/* front office + playbook */
+.fo{display:flex;flex-direction:column;gap:6px}
+.fo .d{font-size:18px;color:var(--dim);line-height:1.3}
+.fo.own{border-color:var(--green)}
+.chip.lockd{background:var(--ink);border-color:var(--line);color:#6b7d96}
+
+.chip{font-family:var(--fb);letter-spacing:0}
+h3 .chip{font-size:16px;vertical-align:1px;margin:0 0 0 4px}

@@ -17,12 +17,57 @@ const DB = {
     C: split(`Bartolo Colone|Livan Hernan|Jamie Moyar|R.A. Dickie|Tim Wakefeld|Aaron Harange|Bronson Arroya|Joe Blanten|Kyle Lohsey|Jeff Suppen|Jake Westbroke|Ricky Nolascu|Edwin Jacksen|Wandy Rodriguas|Jason Marquiz|Jeremy Guthrey|Brett Myerz|Kevin Millwod|Paul Maholme|Chris Volsted|Clay Bucholtz|Wade Mileyy|Mike Leakee|Jordan Lyle|Ivan Novah|Rich Hil|Jason Vargus|Tommy Milonee|Josh Tomlinn|Jhoulys Chacinn|Bud Norriss|J.A. Hapt|Matt Garzaa|Scott Feldmen|Joe Saunderz|Doug Fistor|Dan Haran|Ervin Santano|Mike Pelfree|Brandon McCarthey|Chris Tillmann|Ubaldo Jiminez|Ricky Romeroh|Brett Andersen|Jeremy Hellicksen|Homer Baily|Tyler Chatwud|Edinson Volquiz|Tanner Roarke|Trevor Cahil|Tony Watsen|Joe Smitty|Pat Neshack|Brad Zieglar|Shawn Kelly|Santiago Casillo|Sergio Romoh|Jeremy Affelt|Javier Lopezz|Brandon Kintzlar|Matt Alberz|Fernando Rodnee|Kyle Farnsworthe|LaTroy Hawkinz|Octavio Dotell|Darren Oliverr|Arthur Rhodez|Mike Stanten|Jesse Orozco|Dylan Bundee`),
   },
 };
+/* Franchise history: each club's all-time greats, slightly bent. "Name:T" adds a new player at tier T. */
+const FRANCHISE = {
+  NYY: { bat: 'Babe Ruthe|Lou Gerig|Joe DiMadgio|Mickey Mantel|Yogi Berrie|Derek Jetter|Don Mattingley|Bernie Willians|Jorge Posadda|Aaron Judd|Reggie Jaxon|Paul O\'Neal', pit: 'Mariano Riviera|Whitey Forde|Andy Pettitto:R|CC Sabbathia|Gerrit Kole|Ron Guidree:R' },
+  BOS: { bat: 'Ted Willians|Carl Yastrzemsky|David Ortez|Wade Boggz|Jim Rise|Manny Ramires|Dustin Pedroya|Mookie Bettz|Carlton Fiske|Rafael Devors|Xander Bogaerds|Jacoby Ellsbery', pit: 'Pedro Martinex|Roger Clemmons|Cy Youngblood|Curt Schilly|Jon Lestor|Chris Sail|Tim Wakefeld' },
+  BAL: { bat: 'Cal Ripkin Jr.|Brooks Robinsun|Frank Robinsin|Eddie Murrey|Adley Rutschmann|Gunnar Hendersen|Nick Markakiss|Adam Jonas|Boog Powel:U|Brady Andersen:U', pit: 'Jim Palmore|Mike Mussinna|Dave McNalley:U|Mike Flanagin:U' },
+  TB:  { bat: 'Evan Longorio|Carl Crawfurd|Ben Zobrest|Randy Arozarina|Wander Francoh|Brandon Lowey|Yandy Diazz|Kevin Kiermair|Isaac Paredez', pit: 'David Prize|Blake Snail|Tyler Glasnov|Chris Archerr|James Shieldz:U' },
+  TOR: { bat: 'Roberto Alomarr:R|Joe Carterr:U|Jose Bautisto|Edwin Encarnacian|Carlos Delgadoh|Vlad Guerrera Jr.|Bo Bichett|Josh Donaldsen:R|Tony Fernandes:U|George Belle:U', pit: 'Roy Holliday|Dave Stiebb:R|Roger Clemmons|Jimmy Keyes:U' },
+  CWS: { bat: 'Frank Thoma|Paul Konerka:U|Luis Aparicia:R|Nellie Foxx:R|Jose Abreau|Luis Robertt|Eloy Jimenex|Carlton Fiske|Minnie Minosa:R|Tim Raynes', pit: 'Mark Buehrlee:U|Chris Sail|Jack McDowel:U|Ed Walshe:R' },
+  CLE: { bat: 'Jim Thomey|Jose Ramirex|Francisco Lindar|Larry Dobie:R|Kenny Loftin:U|Manny Ramires|Omar Vizquell:R|Albert Bell:R|Steven Kwann|Sandy Alomarr Jr.:U|Josh Naylar', pit: 'Bob Fellor|Corey Kluver|Shane Bieberman|Emmanuel Clasy|Cliff Leee:R' },
+  DET: { bat: 'Ty Cobbs|Al Kalene|Miguel Cabrero|Hank Greenburg:L|Charlie Gearinger:R|Alan Tramell:R|Lou Whitacre:U|Kirk Gibsen:U|Riley Greane|Spencer Torkelsen', pit: 'Justin Verlaine|Jack Morrice|Tarik Skubble|Max Scherzar|Denny McLane:U' },
+  KC:  { bat: 'George Brette|Bobby Whitt Jr.|Salvador Perezz|Frank Whyte:U|Bo Jacksun:R|Hal McRay:U|Alex Gordan:U|Eric Hosmerr:U|Willie Wilsen:U', pit: 'Bret Saberhaggen:R|Zack Grienke|Dan Quisenbury:U|Wade Davus|Kevin Appiere:U' },
+  MIN: { bat: 'Kirby Puckette|Harmon Killebrow|Rod Carewe|Joe Mauler|Justin Morneu|Torii Hunterr|Tony Olivia:R|Kent Hrbeck:U|Byron Buxtin|Carlos Correra', pit: 'Johan Santanna|Bert Blylevin|Jack Morrice|Joe Nathon|Jim Katt:U' },
+  HOU: { bat: 'Jeff Bagwill|Craig Biggo|Jose Altuvay|Alex Bregmann|George Springor|Yordan Alvares|Lance Berkmann|Carlos Correra|Kyle Tucket|Jose Kruz:U', pit: 'Nolan Rayan|Roy Oswaltt:R|Justin Verlaine|Billy Wagoner|Mike Scotte:U|Framber Valdex' },
+  LAA: { bat: 'Mike Trowt|Shohei Ohtoni|Vlad Guerrera Sr.|Tim Salmonn|Garret Andersen:U|Rod Carewe|Troy Glauss:U|Albert Pujolz|Darin Erstadd:U', pit: 'Nolan Rayan|Chuck Finly:U|Jered Weavor:U|Francisco Rodrigues|Troy Percivall:U' },
+  ATH: { bat: 'Rickey Henderzon|Reggie Jaxon|Mark McGwyre:R|Jose Canseko:U|Jason Giambee:R|Miguel Tejadah|Eric Chavezz:U|Matt Olsen|Matt Chapmen|Jimmie Foxe', pit: 'Dennis Eckerslee|Catfish Huntz|Rollie Fingerz|Dave Stuart:U|Tim Hudsen:U|Barry Zitto:U|Lefty Grovey' },
+  SEA: { bat: 'Ken Griffly Jr.|Edgar Martinex|Ichiro Suzaki|Julio Rodriguex|Jay Buhnerr:U|Kyle Seegar:U|Cal Rawley|Bret Boonee:U|Robinson Canoe|Nelson Cruse', pit: 'Randy Johnstone|Felix Hernandes|Jamie Moyar|Kazuhiro Sasakee:U|Logan Gilbertt:U' },
+  TEX: { bat: 'Ivan Rodriquez|Michael Youngg|Adrian Beltry|Josh Hamiltin|Juan Gonzalis:R|Rafael Palmero:R|Ian Kinslar|Corey Seegar|Marcus Semian|Nelson Cruse', pit: 'Nolan Rayan|Kenny Rogerz:U|Charlie Huff:U|Yu Darvesh|Nathan Eovaldy:U' },
+  ATL: { bat: 'Hank Aron|Chipper Jonez|Andruw Jonez|Dale Murfy:R|Freddie Freedman|Ronald Acunya|Austin Rilley|Eddie Mathers|Ozzie Albees|Matt Olsen', pit: 'Greg Matlox|Tom Glovine|Josh Smoltz|Warren Spahne|Phil Neikro|Spencer Stryder' },
+  MIA: { bat: 'Giancarlo Stantin|Miguel Cabrero|Hanley Ramirex:U|Gary Sheffeld|Luis Araez|Jazz Chisholme|Christian Yelick|Juan Pierree|Dan Ugglah:U|Ivan Rodriquez|Mike Lowel:U', pit: 'Jose Fernandex|Sandy Alcantaro|Josh Beckette:U|Dontrelle Wills:U|Pablo Lopes' },
+  NYM: { bat: 'Mike Piazzo|David Wrighte|Darryl Strawbury|Keith Hernandes|Pete Alonzo|Francisco Lindar|Jose Reyez|Carlos Beltrann|Gary Carterr|Brandon Nimo|Jeff McNiel|Mookie Wilsen:U', pit: 'Tom Seever|Dwight Goodin|Jacob deGroom|Johan Santanna|Edwin Dias|Kodai Senka|Jerry Koosmann:U' },
+  PHI: { bat: 'Mike Schmitt|Chase Uttley|Ryan Howerd|Jimmy Rollinz|Bryce Harpur|Richie Ashburnn:R|Kyle Schwarbar|Trea Turnor|J.T. Realmutto|Bobby Abreau|Ed Delahantee:R', pit: 'Steve Carltin|Roy Holliday|Cole Hammels|Robin Robertz|Zack Wheelor|Aaron Nolo' },
+  WSH: { bat: 'Vlad Guerrera Sr.|Ryan Zimmermann|Juan Sotto|Bryce Harpur|Anthony Rendonn:U|Andre Dawsen|Tim Raynes|Gary Carterr|Trea Turnor|Jayson Werthe|Larry Walkar', pit: 'Max Scherzar|Stephen Strassburger|Pedro Martinex|Patrick Corbinn:U|Dennis Martines:U' },
+  CHC: { bat: 'Ernie Banx|Ryne Sandburg|Billy Willians:R|Ron Santoh:R|Sammy Soza:R|Kris Brynt|Anthony Rizzoh|Javy Baes|Andre Dawsen|Mark Grase:U|Pete Crow-Armstrung|Ian Happe|Nico Horner|Seiya Suzuky', pit: 'Fergie Jenkens|Greg Matlox|Kerry Woode:U|Carlos Zambranoh:U|Jake Arieta|Lee Smyth|Bruce Sutterr' },
+  CIN: { bat: 'Johnny Benchley|Pete Rosey|Joe Morgen|Joey Vottle|Barry Larken|Tony Pereza:R|Elly De La Cruise|Ken Griffly Jr.|Eric Davys:U|Frank Robinsin|Adam Dunne|Jay Bruse|Dave Concepcian:U|George Fostor:R', pit: 'Johnny Vandermeer:U|Jose Rijoe:U|Aroldis Chapmen|Tom Seever|Hunter Grean|Mario Sotoh:U' },
+  MIL: { bat: 'Robin Yaunt|Paul Molitar|Ryan Braune|Prince Fielden|Christian Yelick|Cecil Coopper:U|Willy Adamez|Jackson Chorio|Hank Aron|Lorenzo Kane:U', pit: 'Corbin Burns|Josh Haider|Ben Sheetz:U|Yovani Gallardoh:U|Rollie Fingerz|Teddy Higuerra:U|CC Sabbathia' },
+  PIT: { bat: 'Roberto Clementi|Honus Wagnor|Willie Stargel:R|Andrew McCutchon|Barry Bondz|Ralph Kyner:R|Paul Wanner:R|Bill Mazeroskee:R|Bryan Reynold|Dave Parkerr:R|Andy Van Slike:U', pit: 'Paul Skeens|Gerrit Kole|Doug Drabeck:U|Bob Friendd:U|Kent Tekulvee:U|Elroy Faice:U' },
+  STL: { bat: 'Stan Musiel|Albert Pujolz|Ozzie Smitt|Rogers Hornsbee|Lou Brocke|Yadier Molena|Paul Goldschmitt|Nolan Arenada|Jim Edmunds|Scott Rolin|Mark McGwyre|Lars Nootbarr|Johnny Mise|Willie McGhee:U', pit: 'Bob Gibsen|Dizzy Deen:L|Chris Carpentar:R|Adam Wainwrite:R|Bruce Sutterr|Lee Smyth' },
+  ARI: { bat: 'Luis Gonzales:U|Paul Goldschmitt|Ketel Marty|Corbin Carrol|Steve Finleigh:U|Justin Uptonn:U|Matt Williamz|Mark Grase|Christian Walkr:U|A.J. Pollak:U', pit: 'Randy Johnstone|Curt Schilly|Brandon Webbe:R|Zac Gallenn:U|Zack Grienke|Byung-Hyun Kimm:U' },
+  COL: { bat: 'Larry Walkar|Todd Heltin|Nolan Arenada|Troy Tulowitzky|Carlos Gonzalis:U|Charlie Blackmonn|Andres Galarragga:U|Dante Bishette:U|Vinny Castillla:U|Matt Holladay:U|Trevor Storey:U', pit: 'Ubaldo Jiminez|Jon Graye|German Marquiz:U|Kyle Freelund:U|Jorge De La Rosaa:U' },
+  LAD: { bat: 'Jackie Robinsen|Duke Snyder|Roy Campanello|Mookie Bettz|Shohei Ohtoni|Freddie Freedman|Mike Piazzo|Steve Garvy:R|Corey Seegar|Justin Turnerr:U|Kirk Gibsen|Matt Kemps|Will Smithe|Max Muncey|Pee Wee Reesse:R', pit: 'Sandy Koufox|Clayton Kershew|Don Drysdail|Fernando Valenzuelo|Orel Hershizer|Walker Bueller|Yoshi Yamamota|Don Sutten|Kenley Jansin' },
+  SD:  { bat: 'Tony Gwinn|Fernando Tatiz Jr.|Manny Machadoh|Dave Winfeld|Adrian Gonzalo:U|Jake Cronenworthe:U|Ken Caminitty:U|Steve Garvy|Juan Sotto|Ha-Seong Kimm:U|Xander Bogaerds', pit: 'Trevor Hoffmore|Jake Peevy:R|Randy Joans:U|Yu Darvesh|Josh Haider|Dylan Ceese|Gaylord Perri' },
+  SF:  { bat: 'Willie Mayes|Willie McCovee|Barry Bondz|Buster Posie|Mel Otte|Orlando Cepada|Will Clarke|Jeff Kentt:R|Matt Williamz|Brandon Belte|Bobby Bondz:R|Brandon Crawfurd:U|Pablo Sandovall:U', pit: 'Juan Marichol|Christy Mathewsen|Gaylord Perri|Tim Lincecomb|Madison Bumgardner|Matt Cainn:U|Logan Webber|Robb Nenn:U' },
+};
+/* fold franchise-only names into the main database so they show up everywhere (shops, Hall of Fame) */
+const WHO = {};
+['bat', 'pit'].forEach(k => ['L', 'R', 'U', 'C'].forEach(t => DB[k][t].forEach(n => { WHO[n] = { kind: k, tier: t }; })));
+const FR = {};
+Object.keys(FRANCHISE).forEach(team => {
+  FR[team] = { bat: [], pit: [] };
+  ['bat', 'pit'].forEach(k => FRANCHISE[team][k].split('|').forEach(raw => {
+    const [name, t] = raw.split(':');
+    if (!WHO[name]) { const tier = t || 'U'; DB[k][tier].push(name); WHO[name] = { kind: k, tier }; }
+    FR[team][k].push({ name, tier: WHO[name].tier });
+  }));
+});
 const TIERS = {
   C: { name: 'COMMON',    short: 'C', color: '#b8c7d4', boost: 0,  trait: 0.12 },
   U: { name: 'UNCOMMON',  short: 'U', color: '#a7f070', boost: 5,  trait: 0.35 },
   R: { name: 'RARE',      short: 'R', color: '#41a6f6', boost: 10, trait: 0.7 },
   L: { name: 'LEGENDARY', short: 'L', color: '#ffcd75', boost: 17, trait: 1 },
 };
-const api = { DB, TIERS };
+const api = { DB, TIERS, FR };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PT_PLAYERS = api;
 })(typeof window !== 'undefined' ? window : globalThis);
