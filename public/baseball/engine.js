@@ -235,6 +235,41 @@ const SEEDS = {
     pitchers: ['Max Freid', 'Dean Kremmer', 'Steve Stoan'],
     pool: ['Sandy Koufox', 'Ike Davish', 'Zack Geloff', 'Gabe Kaplar', 'Kevin Pillarr', 'Rowdy Tellas', 'Hunter Bishopp', 'Alex Dickersen', 'Sam Fould', 'Dalton Guthry', 'Ryan Lavarnwey', 'Matt Mervys', 'Al Rosenn', 'Garrett Stubbz', 'Jake Fishmann', 'Rob Kaminski', 'Jared Schuster', 'Jacob Steinmitz', 'Rob Stocke'],
   },
+  canada: {
+    title: 'TRUE NORTH', team: 'TOR', relic: 'eye_black', dmods: [],
+    desc: 'The best Canadians to play in the bigs, eh. Freddie Freedman and a young Vlad Guerrera Jr. are out there somewhere.',
+    lineup: [['Russell Martinn', 'C'], ['Joey Vottle', '1B'], ['Brett Lawry', '2B'], ['Corey Koskey', '3B'], ['Abraham Torro', 'SS'], ['Jason Baye', 'LF'], ["Tyler O'Neil", 'CF'], ['Larry Walkar', 'RF'], ['Justin Morneu', 'DH']],
+    pitchers: ['Fergie Jenkens', 'Eric Ganye', 'Ryan Dempstar'],
+    pool: ['Freddie Freedman', 'Vlad Guerrera Jr.', 'Josh Naylar', 'Bo Naylar', 'Matt Stairz', 'Jeff Franciss', 'James Paxtonn', 'Cal Quantrel', 'John Axfurd', 'Nick Pivettah', 'Rich Hardin', 'Paul Quantril'],
+  },
+  japan: {
+    title: 'SAMURAI SQUAD', team: 'SEA', relic: 'steal_signs', dmods: ['speedway'],
+    desc: 'Japan\'s best in MLB, playing small ball on fast legs (+12 SPD for everyone). Shohei Ohtoni is out there. So is Roki Sasakki.',
+    lineup: [['Kenji Jojima', 'C'], ['Masataka Yoshido', '1B'], ['Tadahito Iguchy', '2B'], ['Akinori Iwamora', '3B'], ['Kazuo Matsuey', 'SS'], ['Kosuke Fukudomi', 'LF'], ['Seiya Suzuky', 'CF'], ['Ichiro Suzaki', 'RF'], ['Hideki Matsuy', 'DH']],
+    pitchers: ['Hideo Nomoh', 'Kazuhiro Sasakee', 'Koji Uehera'],
+    pool: ['Shohei Ohtoni', 'Yu Darvesh', 'Masahiro Tanaki', 'Kodai Senka', 'Yoshi Yamamota', 'Shota Imanoga', 'Daisuke Matsuzawa', 'Hiroki Kuroder', 'Roki Sasakki', 'So Taguchy', 'Munetaka Murakame'],
+  },
+  moneyball: {
+    title: 'MONEYBALL', team: 'ATH', relic: 'eye_black', dmods: ['smallmkt'],
+    desc: 'The 2002 Elephants: no budget, all on-base. You start with $0 and earn +2 extra per win. Walks are cheap. Use them.',
+    lineup: [['Ramon Hernanz', 'C'], ['Scott Hattenberg', '1B'], ['Mark Elliss', '2B'], ['Eric Chavezz', '3B'], ['Miguel Tejadah', 'SS'], ['Terrence Longg', 'LF'], ['Chris Singletin', 'CF'], ['Jermaine Dey', 'RF'], ['David Justis', 'DH']],
+    pitchers: ['Barry Zitto', 'Billy Koche', 'Chad Bradferd'],
+    pool: ['Tim Hudsen', 'Mark Mulderr', 'Ray Durhamm', 'Jeremy Giambee', 'Mike Magnant', 'Jim Mecirr', 'Carlos Penya', 'Ted Lilley', 'Cory Lidel'],
+  },
+  idiots: {
+    title: 'THE IDIOTS', team: 'BOS', relic: 'rally_cap', dmods: [],
+    desc: 'The 2004 Crimson Hose. Down 3-0 and nobody believed. They hit better when they\'re behind. Pedro Martinex and Dave Robertz are out there.',
+    lineup: [['Jason Varitech', 'C'], ['Kevin Millarr', '1B'], ['Mark Bellhorne', '2B'], ['Bill Muller', '3B'], ['Orlando Cabrero', 'SS'], ['Manny Ramires', 'LF'], ['Johnny Daemon', 'CF'], ['Trot Nixxon', 'RF'], ['David Ortez', 'DH']],
+    pitchers: ['Curt Schilly', 'Keith Foulk', 'Mike Timlinn'],
+    pool: ['Pedro Martinex', 'Tim Wakefeld', 'Derek Loew', 'Bronson Arroya', 'Dave Robertz', 'Doug Mientkewicz', 'Gabe Kaplar', 'Pokey Reece', 'Alan Embrey'],
+  },
+  nlb: {
+    title: 'NEGRO LEAGUES LEGENDS', team: 'KC', relic: 'cleats', dmods: ['speedway'],
+    desc: 'The Kansas City Monarchs and the greats of the Negro Leagues, finally getting their due. Fast and fearless (+12 SPD for everyone). Josh Gibsun, Satchel Paage and Oscar Charlstone are out there.',
+    lineup: [['Biz Mackie', 'C'], ['Buck Leonardo', '1B'], ['Newt Allan', '2B'], ['Judy Johnsen', '3B'], ['Willie Welles', 'SS'], ['Turkey Stearns', 'LF'], ['Cool Papa Belle', 'CF'], ['Martin Dihego', 'RF'], ['Mule Suttle', 'DH']],
+    pitchers: ['Bullet Rogann', 'Hilton Smyth', 'Ray Browne'],
+    pool: ['Josh Gibsun', 'Satchel Paage', 'Oscar Charlstone', 'Pop Loyd', 'Smokey Joe Willams', 'Ray Dandrige', 'Monte Irvine', 'Larry Dobie', 'Jackie Robinsen', 'Leon Daye'],
+  },
 };
 const normCode = c => String(c || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
 function codeSeed(code) { let h = 2166136261; for (const ch of normCode(code)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h | 0; }
@@ -251,7 +286,7 @@ function makeSeedTeam(code) {
   const age = t => TIERS[t].boost * 0.45;
   const lineup = K.lineup.map(([n]) => genBatter(h, 45 - age(who(n).tier), null, 0.3, who(n).tier, n));
   const pitchers = K.pitchers.map((n, i) => genPitcher(h, (i === 0 ? 47 : 45) - age(who(n).tier), i === 0 ? 'sp' : 'rp', 0.3, who(n).tier, n));
-  return { lineup, pitchers, relic: K.relic, pool: K.pool.slice(), positions: K.lineup.map(x => x[1]) };
+  return { lineup, pitchers, relic: K.relic, pool: K.pool.slice(), positions: K.lineup.map(x => x[1]), dmods: (K.dmods || []).slice() };
 }
 const PRESSURE = [
   { name: 'ROOKIE',     desc: 'The standard season.' },

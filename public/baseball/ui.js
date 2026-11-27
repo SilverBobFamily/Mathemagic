@@ -12,6 +12,17 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
 let settings = Object.assign({ mode: 'key', sound: true, fast: false }, store.get('pinetar.set', {}));
+/* Speed: auto-played at-bats always run one notch faster than the at-bats you call yourself. */
+const SPEEDS = ['normal', 'fast', 'turbo'];
+if (!SPEEDS.includes(settings.speed)) settings.speed = settings.speed === 'turbo' ? 'turbo' : 'fast';
+const SPEED = {
+  normal: { anim: 0.75, pre: 150, post: 300, postRun: 600, pull: 400 },
+  fast:   { anim: 0.4,  pre: 30,  post: 90,  postRun: 280, pull: 180 },
+  turbo:  { anim: 0.16, pre: 0,   post: 25,  postRun: 110, pull: 60 },
+  instant:{ anim: 0.05, pre: 0,   post: 4,   postRun: 45,  pull: 20 },
+};
+const speedFor = auto => SPEED[auto ? ['fast', 'turbo', 'instant'][SPEEDS.indexOf(settings.speed)] : settings.speed];
+const nextSpeed = () => { settings.speed = SPEEDS[(SPEEDS.indexOf(settings.speed) + 1) % 3]; settings.fast = settings.speed !== 'normal'; saveSettings(); };
 let meta = Object.assign({ runs: 0, best: 0, titles: 0, bestWins: 0, onboarded: false, tips: {}, tipsOff: false, lastTeam: null, hof: {}, pressure: 0, daily: {}, gauntletBest: 0 }, store.get('pinetar.meta', {}));
 const saveMeta = () => store.set('pinetar.meta', meta);
 /* Front Office: owned unlocks + Fans. Players from before this update get Fans for the runs they already played. */
@@ -289,11 +300,11 @@ const Field = (() => {
     },
     setMatch(pa) { st.batSide = pa.side; st.batter = pa.batter; st.pitcher = pa.pitcher; kick(); draw(performance.now()); },
     clearBatter() { st.batter = null; },
-    play(ev, fast, G) {
+    play(ev, mult, G) {
       return new Promise(res => {
         let dur = (ev.type === 'pa' || ev.type === 'bunt') ? 1000 : ev.type === 'steal' ? 750 : 450;
         if (ev.ball === 'hr') dur *= 1.4;
-        if (fast) dur *= 0.5;
+        dur *= (typeof mult === 'number' ? mult : (mult ? 0.5 : 1));
         ev.hrx = 80 + (hash(ev.batter) % 2 ? -52 : 52) * 0.8;
         st.anim = { ev, t0: performance.now(), dur, res };
         st.batSide = ev.side || st.batSide;
@@ -387,12 +398,12 @@ function showSettings(inGame) {
     m.querySelector('.box').innerHTML = `<h2>SETTINGS</h2>
     <h3>DECISIONS</h3>
     ${modes.map(([k, n, d]) => `<button class="btn ${settings.mode === k ? 'on' : ''}" data-m="${k}">${n}<small>${d}</small></button>`).join('')}
-    <div class="grid2"><button class="btn ${settings.fast ? 'on' : ''}" id="fast">SPEED: ${settings.fast ? 'FAST' : 'NORMAL'}</button><button class="btn ${settings.sound ? 'on' : ''}" id="snd">SOUND: ${settings.sound ? 'ON' : 'OFF'}</button></div>
+    <div class="grid2"><button class="btn ${settings.speed !== 'normal' ? 'on' : ''}" id="fast">SPEED: ${settings.speed.toUpperCase()}<small>auto at-bats go one notch faster</small></button><button class="btn ${settings.sound ? 'on' : ''}" id="snd">SOUND: ${settings.sound ? 'ON' : 'OFF'}</button></div>
     <button class="btn ${meta.tipsOff ? '' : 'on'}" id="tips">COACH TIPS: ${meta.tipsOff ? 'OFF' : 'ON'}</button>
     ${inGame ? '<button class="btn warn" id="quit">SAVE AND QUIT TO TITLE</button>' : '<button class="btn" id="replay">REPLAY TUTORIAL</button><button class="btn" id="restore">RESTORE A BACKUP<small>Last 3 between-game autosaves</small></button>'}
     <button class="btn go" id="x">CLOSE</button>`;
     $$('[data-m]', m).forEach(b => b.onclick = () => { settings.mode = b.dataset.m; saveSettings(); snd('click'); render(m); });
-    $('#fast', m).onclick = () => { settings.fast = !settings.fast; saveSettings(); snd('click'); render(m); };
+    $('#fast', m).onclick = () => { nextSpeed(); snd('click'); render(m); };
     $('#snd', m).onclick = () => { settings.sound = !settings.sound; saveSettings(); snd('click'); render(m); };
     $('#x', m).onclick = () => { snd('click'); closeModal(m); };
     $('#tips', m).onclick = () => { meta.tipsOff = !meta.tipsOff; saveMeta(); snd('click'); render(m); };
@@ -503,7 +514,8 @@ function screenModes() {
       <button class="btn go" id="go-season">START SEASON</button>
     </div>
     <div class="px mode" id="m-code">
-      <h2>ENTER A CODE</h2><div class="d">Same code, same game: city, rosters, schedule, shops. Share one with a friend and compare. Try <span class="y">jooz</span>.</div>
+      <h2>ENTER A CODE</h2><div class="d">Same code, same game: city, rosters, schedule, shops. Share one with a friend and compare, or try a themed roster:</div>
+      <div class="codes">${Object.keys(E.SEEDS).map(k => `<button class="chip m" data-code="${k}">${k}</button>`).join('')}</div>
       <div class="row"><input id="code" class="codein" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type a code" aria-label="Game code"><button class="btn go" id="go-code">GO</button></div>
     </div>
     <div class="px mode" id="m-daily">
@@ -531,6 +543,7 @@ function screenModes() {
     if (info.known) screenSeedPreview(info); else newDraft();
   };
   $('#go-code').onclick = goCode;
+  $$('[data-code]').forEach(b => b.onclick = () => { $('#code').value = b.dataset.code; goCode(); });
   $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') goCode(); });
   $('#back').onclick = () => { snd('click'); screenTitle(); };
   $$('[data-p]').forEach(b => b.onclick = () => { pressSel = +b.dataset.p; snd('click'); const y = $('.screen').scrollTop; screenModes(); $('.screen').scrollTop = y; });
@@ -549,7 +562,8 @@ function screenSeedPreview(info) {
   mount(`<div class="screen">
     <div class="top"><h2 class="sp">CODE: ${info.code.toUpperCase()}</h2><button class="btn sm" id="back">BACK</button></div>
     <div class="px hl"><h2>${K.title}</h2><p class="dim" style="font-size:18px;margin-top:6px">${K.desc}</p>
-      <p style="font-size:18px;margin-top:6px">Playing as the <span class="y">${E.teamName(info.team)}</span>. Starting relic: <span class="y">${E.RELICS[K.relic].name}</span>.</p></div>
+      <p style="font-size:18px;margin-top:6px">Playing as the <span class="y">${E.teamName(info.team)}</span>. Starting relic: <span class="y">${E.RELICS[K.relic].name}</span>.</p>
+      ${(K.dmods || []).length ? `<div style="margin-top:6px">${K.dmods.map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('')}</div>` : ''}</div>
     <h3>STARTING LINEUP</h3>
     <div style="display:flex;flex-direction:column;gap:5px">${team.lineup.map((p, i) => playerRow(p, team.positions[i])).join('')}</div>
     <h3>PITCHING STAFF</h3>
@@ -562,7 +576,7 @@ function screenSeedPreview(info) {
   $('#ok').onclick = () => {
     snd('buy');
     run = E.startRun({ key: 'custom', team: { lineup: team.lineup, pitchers: team.pitchers }, relic: team.relic }, info.seed, info.team,
-      { mode: 'seeded', code: info.code, namePool: team.pool });
+      { mode: 'seeded', code: info.code, namePool: team.pool, dmods: team.dmods });
     collectRoster(); saveRun(); backupRun(); screenClub();
   };
 }
@@ -781,7 +795,7 @@ function screenClub() {
   if (run._bak !== run.stage) { run._bak = run.stage; backupRun(); }
   saveRun(true);
   const opp = E.oppFor(run);
-  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'seeded' ? `<span class="chip m">CODE: ${(run.code || '').toUpperCase()}</span>` : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
+  const modeChips = (run.mode === 'gauntlet' ? '<span class="chip m">GAUNTLET</span>' : run.mode === 'seeded' ? `<span class="chip m">CODE: ${(run.code || '').toUpperCase()}</span>` + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.mode === 'daily' ? '<span class="chip m">DAILY</span>' + (run.dmods || []).map(k => `<span class="chip m">${E.DAILY_MODS[k].name}</span>`).join('') : run.pressure ? `<span class="chip m">PRESSURE ${run.pressure}</span>` : '');
   const my = teamRating();
   const theirBat = Math.round(opp.lineup.reduce((a, p) => a + E.ovr(p), 0) / 9), theirSp = E.ovr(opp.pitchers[0]);
   const cmp = (a, b) => `<span class="${a > b ? 'g' : a < b ? 'r' : ''}">${a}</span> <span class="dim">vs</span> ${b}`;
@@ -957,8 +971,8 @@ function situation(G) {
   return `${G.outs} out${G.outs === 1 ? '' : 's'}, ${on.length ? 'runners: ' + on.join(' ') : 'bases empty'}. ${diff === 0 ? 'Tied' : diff > 0 ? 'Up ' + diff : 'Down ' + (-diff)}.`;
 }
 function quietPanel(text) {
-  $('#panel').innerHTML = `<div class="panel quiet"><div class="row"><span class="dim sp">${text || 'PLAYING...'}</span><button class="btn sm ${settings.fast ? 'on' : ''}" id="ff">${settings.fast ? 'FAST' : 'NORMAL'}</button></div></div>`;
-  $('#ff').onclick = () => { settings.fast = !settings.fast; saveSettings(); snd('click'); $('#ff').className = 'btn sm' + (settings.fast ? ' on' : ''); $('#ff').textContent = settings.fast ? 'FAST' : 'NORMAL'; };
+  $('#panel').innerHTML = `<div class="panel quiet"><div class="row"><span class="dim sp">${text || 'PLAYING...'}</span><button class="btn sm ${settings.speed !== 'normal' ? 'on' : ''}" id="ff">${settings.speed.toUpperCase()}</button></div></div>`;
+  $('#ff').onclick = () => { nextSpeed(); snd('click'); const f = $('#ff'); f.className = 'btn sm' + (settings.speed !== 'normal' ? ' on' : ''); f.textContent = settings.speed.toUpperCase(); };
 }
 /* plain-language odds: on base, homer, strikeout, with the change vs NORMAL colored good/bad for you */
 function oddsBlock(o, base, bat, isBase) {
@@ -1028,8 +1042,8 @@ const BANNER = {
   K: ['STRIKEOUT!', 'k'], BB: ['WALK', 'bb'], '1B': ['SINGLE!', 'hit'], '2B': ['DOUBLE!', 'hit'], '3B': ['TRIPLE!', 'hit'], HR: ['HOME RUN!', 'hr'],
   GO: ['GROUND OUT', 'out'], FO: ['FLY OUT', 'out'], SAC: ['SAC BUNT', 'out'], FC: ['BUNT FAIL', 'out'],
 };
-async function animate(G, ev) {
-  const fast = settings.fast;
+async function animate(G, ev, auto) {
+  const sp = speedFor(auto), fast = sp.anim < 0.5;
   let label = null, good = true, sound = 'out';
   if (ev.type === 'signs') { label = 'NEW SIGNS'; good = true; sound = 'steal'; }
   else if (ev.type === 'steal') { label = ev.res === 'safe' ? 'SAFE!' : 'OUT!'; good = ev.res === 'safe'; sound = ev.res === 'safe' ? 'steal' : 'bad'; }
@@ -1050,10 +1064,10 @@ async function animate(G, ev) {
   }
   if (ev.type !== 'pull') snd(sound);
   if (ev.code === 'HR') { const fw = $('#fw'); fw.classList.remove('shake'); void fw.offsetWidth; fw.classList.add('shake'); setTimeout(() => snd('hr'), 250); }
-  await Field.play(ev, fast, G);
-  if (ev.type === 'pull') await sleep(fast ? 200 : 500);
+  await Field.play(ev, sp.anim, G);
+  if (ev.type === 'pull') await sleep(sp.pull);
   updateBoard(G);
-  await sleep(fast ? 150 : (ev.runs ? 700 : 380));
+  await sleep(ev.runs || ev.code === 'HR' ? sp.postRun : sp.post);
 }
 
 async function loop() {
@@ -1067,13 +1081,13 @@ async function loop() {
       updateMatch(G, pa); Field.setMatch(pa);
       let act;
       if (pa.decision) { setLog('Your call, skipper.'); act = await askDecision(G, pa); }
-      else { quietPanel(pa.side === 'us' ? 'YOU BAT' : 'THEY BAT'); if (pa.autoPull) act = { type: 'pull' }; else act = { type: pa.side === 'us' ? 'swing' : 'pitch', appr: 'normal' }; await sleep(settings.fast ? 80 : 250); }
+      else { quietPanel(pa.side === 'us' ? 'YOU BAT' : 'THEY BAT'); if (pa.autoPull) act = { type: 'pull' }; else act = { type: pa.side === 'us' ? 'swing' : 'pitch', appr: 'normal' }; const pre = speedFor(true).pre; if (pre) await sleep(pre); }
       quietPanel();
       ev = E.resolve(G, pa, act);
       if (!ev) continue;
     }
-    saveRun();
-    await animate(G, ev);
+    saveRun(true);
+    await animate(G, ev, !pa.decision);
   }
   await gameOver(G);
 }
