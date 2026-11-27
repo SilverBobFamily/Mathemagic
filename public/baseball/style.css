@@ -225,3 +225,6 @@ h3 .chip{font-size:16px;vertical-align:1px;margin:0 0 0 4px}
 .codein{flex:1;min-width:0;font-family:var(--fh);font-size:14px;text-transform:uppercase;color:var(--yellow);background:var(--ink);border:3px solid var(--paper);padding:12px 10px;min-height:46px;-webkit-user-select:text;user-select:text;border-radius:0}
 .codein:focus{outline:3px solid var(--cyan);outline-offset:1px}
 .codein::placeholder{color:#5a6f8c;text-transform:none;font-family:var(--fb);font-size:18px}
+
+.codes{display:flex;flex-wrap:wrap;gap:6px}
+.codes .chip{cursor:pointer;margin:0;font-size:18px;padding:4px 10px;min-height:36px;touch-action:manipulation}
