@@ -383,7 +383,7 @@ function showHelp() {
   <p><span class="y">FRONT OFFICE:</span> every run earns Fans, win or lose. Spend them on new modes (Daily, Draft Day, Franchise Legends, Trade Desk, Gauntlet), relic packs and permanent perks.</p>
   <p><span class="y">SEASON:</span> 12 games ending in the World Series against the Sign Stealers. Win one to unlock the next PRESSURE level (8 total).</p>
   <p>Lose ${E.MAX_LOSSES} games and the run ends.</p>
-  <p><span class="y">GAMES</span> are 6 innings. The sim runs itself. When runners are on, it stops and YOU call the play.</p>
+  <p><span class="y">GAMES</span> pick up in the top of the 7th, scoreless: three innings to win it (extras if tied). Your starter is already tired. The sim runs itself. When runners are on, it stops and YOU call the play.</p>
   <p><span class="y">AT BAT:</span> pick an approach (contact, power, patient), steal, or bunt. <span class="y">PITCHING:</span> attack, nibble, walk a guy, or change pitchers before your arm tires.</p>
   <p><span class="y">CLUTCH</span> charges (3 a game) boost one at-bat or pitch. The numbers on each button are your odds.</p>
   <p><span class="y">BETWEEN GAMES:</span> spend gold on relics, free agents and training. Win a game to pick a free reward. Sometimes something weird happens in the clubhouse. Choose wisely.</p>
@@ -948,7 +948,7 @@ function screenGame() {
       <p class="dim" style="font-size:18px">Mix up your calls. Watch the red READ tags on every button.</p>
       <button class="btn go" id="x">PLAY BALL</button>`, mm => { $('#x', mm).onclick = () => { snd('click'); closeModal(mm); res(); }; });
   }) : Promise.resolve();
-  intro.then(() => tips([['game_field', 'The sim plays itself. In the <span class="y">TOP</span> of each inning they bat. In the <span class="y">BOTTOM</span> you bat. Games are 6 innings. Under the field: who\'s up, who\'s pitching, and the pitcher\'s <span class="g">gas</span> bar.', '#fw']])).then(() => loop());
+  intro.then(() => tips([['game_field', 'The sim plays itself. In the <span class="y">TOP</span> of each inning they bat. In the <span class="y">BOTTOM</span> you bat. Every game picks up in the 7th, scoreless: three innings to win it. Under the field: who\'s up, who\'s pitching, and the pitcher\'s <span class="g">gas</span> bar.', '#fw']])).then(() => loop());
 }
 function updateBoard(G) {
   $('#board').innerHTML = boardHTML(G);
